@@ -1,0 +1,142 @@
+@page "/apps/browse"
+@inject AppState State
+@inject NavigationManager Nav
+
+<div class="apps-page">
+    <div class="apps-page__header">
+        <button class="ghost" @onclick='() => Nav.NavigateTo("apps")'>← Mina appar</button>
+        <div style="flex:1">
+            <h2>@(State.Repo?.OwnerRepo)</h2>
+            <p style="color:var(--color-text-secondary);margin:0">Packs i det här repot</p>
+        </div>
+        @if (State.Repo != null)
+        {
+            <button class="ghost" @onclick='() => Nav.NavigateTo("apps/deploy")'>🚀 Driftsättning</button>
+        }
+    </div>
+
+    @if (State.Repo == null)
+    {
+        <p>Inget repo öppet. <a href="apps">Gå tillbaka</a>.</p>
+    }
+    else if (_loading)
+    {
+        <p><span class="spinner"></span> Hämtar packs…</p>
+    }
+    else
+    {
+        <div class="apps-page__grid">
+            <button class="apps-page__card apps-page__card--new" @onclick="CreatePack">
+                <span style="font-size:28px">＋</span>
+                <span>Nytt pack (AI-genererat)</span>
+            </button>
+
+            @foreach (var packId in _packIds)
+            {
+                <div class="apps-page__card" @onclick="() => OpenPack(packId)" @onkeydown="e => OnCardKeyDown(e, packId)" role="button" tabindex="0">
+                    <button class="ghost apps-page__card-delete" @onclick="() => _pendingDelete = packId" @onclick:stopPropagation="true" title="Radera pack">✕</button>
+                    <strong>@packId</strong>
+                    <span style="color:var(--color-text-muted);font-size:12px">packs/@packId</span>
+                </div>
+            }
+        </div>
+
+        @if (_packIds.Count == 0)
+        {
+            <p style="color:var(--color-text-secondary)">
+                Inga packs än i det här repot. Skapa det första ovan — Playtyper genererar en
+                prompt du klistrar in i Claude, precis som i Packwizard idag.
+            </p>
+        }
+
+        <div style="margin-top:24px">
+            <button class="ghost" @onclick='() => Nav.NavigateTo("apps/bundle")'>📦 Bundle-hantering</button>
+        </div>
+    }
+</div>
+
+@if (_pendingDelete != null)
+{
+    <div class="modal-backdrop" @onclick="() => _pendingDelete = null">
+        <div class="modal card" @onclick:stopPropagation="true">
+            <h3>Radera "@_pendingDelete"?</h3>
+            <p style="color:var(--color-text-secondary)">
+                Tar bort alla filer under <code>packs/@_pendingDelete/</code> (config, aktiviteter,
+                översättningar, teman) — en commit per fil, inte en enda atomisk commit. Går att
+                återställa via Git-historiken om det behövs, men inte via Playtyper — ingen
+                ångra-knapp här, och ett avbrott halvvägs kan lämna paketet delvis raderat.
+            </p>
+            @if (_deleteError != null)
+            {
+                <p class="apps-page__error">@_deleteError</p>
+            }
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                <button class="ghost" @onclick="() => _pendingDelete = null" disabled="@_deleting">Avbryt</button>
+                <button class="primary apps-page__delete-confirm" @onclick="ConfirmDeleteAsync" disabled="@_deleting">
+                    @(_deleting ? "Raderar…" : "Radera permanent")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* apps-page__card was a <button> until 2026-07-13; now a div (role=button)
+       so the delete button below can nest inside it — a button can't
+       legally contain another button (invalid HTML, unpredictable click
+       handling), a div can. */
+    .apps-page__card { position: relative; cursor: pointer; }
+    .apps-page__card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .apps-page__card-delete {
+        position: absolute; top: 6px; right: 6px; padding: 2px 7px; font-size: 12px;
+        border-radius: var(--radius-sm); opacity: 0.5;
+    }
+    .apps-page__card-delete:hover { opacity: 1; }
+</style>
+
+@code {
+    private bool _loading = true;
+    private List<string> _packIds = new();
+
+    private string? _pendingDelete;
+    private bool _deleting;
+    private string? _deleteError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.Repo == null) { _loading = false; return; }
+        _packIds = (await State.Repo.GetPackIdsAsync()).ToList();
+        _loading = false;
+    }
+
+    private void OpenPack(string packId) => Nav.NavigateTo($"pack/{packId}");
+
+    private void OnCardKeyDown(KeyboardEventArgs e, string packId)
+    {
+        if (e.Key is "Enter" or " ") OpenPack(packId);
+    }
+
+    private void CreatePack() => Nav.NavigateTo("pack/new");
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_pendingDelete == null || State.Repo == null) return;
+        _deleting = true;
+        _deleteError = null;
+        try
+        {
+            await State.Repo.DeleteDirectoryAsync(State.Repo.PackDir(_pendingDelete), $"Radera pack {_pendingDelete} (via Playtyper)");
+            _packIds.Remove(_pendingDelete);
+            State.Repo.InvalidateListings();
+            _pendingDelete = null;
+        }
+        catch (RemoteWriteException ex)
+        {
+            _deleteError = $"Kunde inte radera: {ex.Message}";
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+}

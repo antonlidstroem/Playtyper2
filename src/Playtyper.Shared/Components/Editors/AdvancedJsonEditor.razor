@@ -1,0 +1,106 @@
+@* Avancerat-fliken. Fungerar på RÅ TEXT, inte på delar av draft-objektet -
+   "Använd" tolkar om hela textrutan och ersätter motsvarande del av draftet.
+   Enklast robusta modell givet tidsramen: ingen kontinuerlig
+   tvåvägsbindning mellan denna vy och de andra flikarna, bara en
+   explicit "hämta senaste" / "använd det här"-cykel. *@
+
+<div class="editor-pane editor-pane--wide">
+    <h3>Avancerat</h3>
+    <p style="color:var(--color-text-secondary);font-size:13px">
+        Rå text för fält som ännu inte har en egen kontroll i de andra flikarna
+        (t.ex. quiz, actions, streak, export). Ändringar här slår igenom när du
+        trycker "Använd" — och skrivs över om du sedan ändrar samma sak i en
+        annan flik, så växla inte fram och tillbaka mitt i en redigering.
+    </p>
+
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        @foreach (var file in _files)
+        {
+            <button class="@(file == _activeFile ? "" : "ghost")" @onclick="() => SwitchTo(file)">@file</button>
+        }
+    </div>
+
+    <textarea rows="20" @bind="_text" @bind:event="oninput"></textarea>
+
+    @if (_error != null)
+    {
+        <p class="apps-page__error">@_error</p>
+    }
+
+    <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="ghost" @onclick="Refresh">Hämta senaste från utkastet</button>
+        <button class="primary" @onclick="Apply">Använd</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter, EditorRequired] public RemoteRepo Repo { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<string> _files = new();
+    private string _activeFile = "";
+    private string _text = "";
+    private string? _error;
+
+    protected override void OnParametersSet()
+    {
+        _files = Draft.ToFiles(Repo).Keys.Select(FileNameOnly).OrderBy(f => f).ToList();
+        if (string.IsNullOrEmpty(_activeFile) || !_files.Contains(_activeFile))
+            SwitchTo(_files.FirstOrDefault(f => f == "pack.config.json") ?? _files.FirstOrDefault() ?? "");
+    }
+
+    private static string FileNameOnly(string path) => path.Split('/')[^1];
+
+    private void SwitchTo(string file)
+    {
+        _activeFile = file;
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        _error = null;
+        var files = Draft.ToFiles(Repo);
+        var match = files.FirstOrDefault(kv => FileNameOnly(kv.Key) == _activeFile);
+        _text = match.Value ?? "";
+    }
+
+    private void Apply()
+    {
+        _error = null;
+        try
+        {
+            if (_activeFile == "pack.config.json")
+            {
+                Draft.Config = System.Text.Json.JsonSerializer.Deserialize<PackConfig>(_text)
+                    ?? throw new Exception("Tomt resultat");
+            }
+            else if (_activeFile == "theme.css")
+            {
+                Draft.ThemeLight = PackDraft.ThemeFromCss(_text);
+            }
+            else if (_activeFile == "theme-dark.css")
+            {
+                Draft.ThemeDark = PackDraft.ThemeFromCss(_text);
+            }
+            else if (_activeFile.StartsWith("activities."))
+            {
+                var lang = _activeFile.Replace("activities.", "").Replace(".json", "");
+                Draft.ActivitiesByLang[lang] = System.Text.Json.JsonSerializer.Deserialize<List<Activity>>(_text) ?? new();
+            }
+            else if (_activeFile.StartsWith("translations."))
+            {
+                var lang = _activeFile.Replace("translations.", "").Replace(".json", "");
+                Draft.TranslationsByLang[lang] = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(_text) ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Kunde inte tolka innehållet: {ex.Message}";
+            return;
+        }
+
+        _ = OnChanged.InvokeAsync();
+    }
+}

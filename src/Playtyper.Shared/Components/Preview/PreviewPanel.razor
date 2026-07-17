@@ -1,0 +1,134 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@*
+    Renders the pack being edited through Playtypus.Core's REAL AppShell —
+    the "riktig preview" from GAPS.md §2 (P0). Not a facade anymore (the
+    file used to be one; see git history / GAPS.md for that plan if you're
+    wondering why this looks different from what a "before" screenshot
+    might show).
+
+    THE IFRAME IS LOAD-BEARING, NOT DECORATION:
+    Playtypus.Core's stylesheets (ui.css etc.) declare bare-element rules —
+    body { margin:0; background:var(--color-background); ... }, button {},
+    a {}, input/textarea/select {} — and Playtyper's OWN app.css declares
+    the exact same bare selectors for its OWN chrome, with different token
+    names (--color-bg vs --color-background, etc.). Rendering AppShell
+    directly into this document would mean whichever stylesheet finishes
+    loading last wins those rules for the WHOLE page — every button in
+    Playtyper's own sidebar, not just the ones inside the preview — there is
+    no wrapper-div/CSS-scoping trick that contains a bare `body {}` or
+    `button {}` rule to one subtree, since those selectors match by tag
+    everywhere in the document regardless of nesting. An <iframe> is a
+    genuinely separate document with its own CSSOM — the one isolation
+    mechanism here that's guaranteed by the browser rather than by careful
+    selector-writing on either side (which would also mean editing
+    Playtypus.Core's production CSS just to make it embeddable, which is a
+    much bigger and riskier change than this file).
+
+    The iframe points at /preview-frame (PreviewFramePage.razor) — a second
+    instance of this SAME Playtyper app, showing a different route. Pack
+    data crosses via postMessage as JSON (see wwwroot/js/preview-bridge.js
+    and PreviewAdapter.cs), because the two documents have entirely separate
+    DI containers; there is no C# reference to share directly.
+*@
+
+<div class="preview-panel">
+    <div class="preview-panel__header">
+        <span class="preview-panel__label">Förhandsvisning</span>
+        @if (!_childReady)
+        {
+            <span class="badge badge-neutral">Laddar…</span>
+        }
+        else if (_lastSyncError != null)
+        {
+            <span class="badge badge-warning" title="@_lastSyncError">Kunde inte uppdatera</span>
+        }
+        else
+        {
+            <span class="badge badge-success">Live</span>
+        }
+    </div>
+
+    <div class="preview-frame-shell">
+        <iframe @ref="_iframeEl" src="/preview-frame" title="Förhandsvisning av appen"
+                class="preview-frame-shell__iframe"></iframe>
+    </div>
+</div>
+
+<style>
+    .preview-panel { padding: 14px; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
+    .preview-panel__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-shrink: 0; gap: 8px; }
+    .preview-panel__label { font-size: 12px; color: var(--color-text-secondary); }
+
+    .preview-frame-shell {
+        flex: 1; min-height: 480px;
+        border: 1px solid var(--color-border); border-radius: 18px;
+        overflow: hidden; background: var(--color-surface-2);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
+    }
+    .preview-frame-shell__iframe { width: 100%; height: 100%; border: none; display: block; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+
+    private ElementReference _iframeEl;
+    private DotNetObjectReference<PreviewPanel>? _selfRef;
+    private bool _childReady;
+    private string? _lastSyncError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("playtyperPreviewBridge.listenForReady", _iframeEl, _selfRef);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Fires on every edit anywhere in the pack — see PackEditorPage.razor's
+        // OnDraftChanged, which is what actually triggers the re-render this
+        // reacts to (Draft itself is a mutable reference, not reassigned, so
+        // this is the hook GAPS.md asked for: "det nya in-memory-anropet
+        // triggas vid varje ändring"). No debounce: LoadFromMemoryAsync does
+        // no I/O, so there is nothing expensive here to batch.
+        if (_childReady) await SendCurrentDraftAsync();
+    }
+
+    /// <summary>Invoked from JS (preview-bridge.js) once the iframe's own Blazor instance has booted and is listening.</summary>
+    [JSInvokable]
+    public async Task OnChildReady()
+    {
+        _childReady = true;
+        await SendCurrentDraftAsync();
+        StateHasChanged();
+    }
+
+    private async Task SendCurrentDraftAsync()
+    {
+        try
+        {
+            var json = PreviewAdapter.ToJson(Draft);
+            await JS.InvokeVoidAsync("playtyperPreviewBridge.sendToChild", _iframeEl, json);
+            _lastSyncError = null;
+        }
+        catch (Exception ex)
+        {
+            // Keeps whatever the preview was already showing rather than
+            // blanking it — a transient serialization hiccup on one edit
+            // shouldn't lose the last-known-good preview, and the next edit
+            // will retry anyway.
+            _lastSyncError = ex.Message;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_selfRef != null)
+        {
+            try { await JS.InvokeVoidAsync("playtyperPreviewBridge.stopListeningForReady", _iframeEl); } catch { }
+            _selfRef.Dispose();
+        }
+    }
+}

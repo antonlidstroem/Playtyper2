@@ -1,0 +1,128 @@
+<div class="editor-pane editor-pane--wide">
+    <h3>Kategorier</h3>
+    <div class="chip-list">
+        @foreach (var cat in Draft.Config.Categories)
+        {
+            <div class="card chip-edit">
+                <input value="@cat.Emoji" @onchange="e => { cat.Emoji = e.Value?.ToString() ?? cat.Emoji; Notify(); }" style="width:44px;text-align:center" />
+                <input value="@cat.Id" @onchange="e => { cat.Id = e.Value?.ToString() ?? cat.Id; Notify(); }" placeholder="id" style="width:110px" />
+                <input value="@LabelFor(cat.LabelKey)" @onchange="e => { SetLabel(cat.LabelKey, e.Value?.ToString()); Notify(); }" placeholder="Text (sv)" style="flex:1" />
+                <button class="ghost" @onclick="() => { Draft.Config.Categories.Remove(cat); Notify(); }">✕</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="AddCategory">+ Kategori</button>
+
+    <h3 style="margin-top:24px">Filter</h3>
+    <div class="chip-list">
+        @foreach (var filter in Draft.Config.Filters)
+        {
+            <div class="card" style="padding:10px">
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input value="@filter.Id" @onchange="e => { filter.Id = e.Value?.ToString() ?? filter.Id; Notify(); }" placeholder="id" style="width:110px" />
+                    <select value="@filter.Type" @onchange="e => { filter.Type = e.Value?.ToString() ?? filter.Type; Notify(); }" style="width:130px">
+                        <option value="segmented">segmented</option>
+                        <option value="multiSelect">multiSelect</option>
+                        <option value="toggle">toggle</option>
+                    </select>
+                    <input value="@LabelFor(filter.LabelKey)" @onchange="e => { SetLabel(filter.LabelKey, e.Value?.ToString()); Notify(); }" placeholder="Text (sv)" style="flex:1" />
+                    <button class="ghost" @onclick="() => { Draft.Config.Filters.Remove(filter); Notify(); }">✕</button>
+                </div>
+                <div style="margin-left:4px;margin-top:6px;font-size:12px;color:var(--color-text-muted)">
+                    @filter.Options.Count alternativ — redigeras i Avancerat tills vidare
+                </div>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="AddFilter">+ Filter</button>
+
+    <h3 style="margin-top:24px">Funktioner</h3>
+    <p style="color:var(--color-text-secondary);font-size:13px">
+        Genererad direkt ur FeatureManifest — samma katalog som styr AI-prompten, så de här
+        aldrig kan glida isär. Fält med mer komplex struktur (streak, export, m.fl.) redigeras
+        i Avancerat tills vidare.
+    </p>
+
+    @foreach (var group in FeatureFlagsReflection.AllBindings().GroupBy(b => b.Feature.Category))
+    {
+        <h4 style="margin-top:16px;font-size:13px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.03em">@group.Key</h4>
+        <div class="feature-grid">
+            @foreach (var binding in group)
+            {
+                <div class="feature-row" title="@binding.Feature.What">
+                    <span class="feature-row__label">@binding.Feature.What</span>
+                    @if (binding.Kind == FeatureKind.Bool)
+                    {
+                        var val = (bool)(binding.GetValue(Draft.Config.Features) ?? false);
+                        <label class="switch">
+                            <input type="checkbox" checked="@val" @onchange="e => { binding.SetValue(Draft.Config.Features, (bool)(e.Value ?? false)); Notify(); }" />
+                            <span class="switch__track"></span>
+                        </label>
+                    }
+                    else if (binding.Kind == FeatureKind.Int)
+                    {
+                        <input type="number" style="width:80px" value="@binding.GetValue(Draft.Config.Features)"
+                               @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var n)) { binding.SetValue(Draft.Config.Features, n); Notify(); } }" />
+                    }
+                    else
+                    {
+                        <input style="width:160px" value="@binding.GetValue(Draft.Config.Features)"
+                               @onchange="e => SetStringFeature(binding, e)" />
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .chip-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .chip-edit { display: flex; gap: 8px; align-items: center; padding: 8px; }
+    .feature-grid { display: flex; flex-direction: column; gap: 2px; }
+    .feature-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: var(--radius-sm); }
+    .feature-row:hover { background: var(--color-surface-2); }
+    .feature-row__label { font-size: 13px; }
+    .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch__track { position: absolute; inset: 0; background: var(--color-border-strong); border-radius: 100px; transition: .15s; cursor: pointer; }
+    .switch__track::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .15s; }
+    .switch input:checked + .switch__track { background: var(--color-accent); }
+    .switch input:checked + .switch__track::before { transform: translateX(16px); }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string LabelFor(string labelKey) =>
+        Draft.TranslationsByLang.TryGetValue("sv", out var dict) && dict.TryGetValue(labelKey, out var v) ? v : "";
+
+    private void SetLabel(string labelKey, string? value)
+    {
+        if (!Draft.TranslationsByLang.TryGetValue("sv", out var dict))
+            Draft.TranslationsByLang["sv"] = dict = new();
+        dict[labelKey] = value ?? "";
+    }
+
+    private void AddCategory()
+    {
+        var id = $"category-{Draft.Config.Categories.Count + 1}";
+        Draft.Config.Categories.Add(new CategoryConfig { Id = id, LabelKey = $"category.{id}", Emoji = "📁" });
+        Notify();
+    }
+
+    private void AddFilter()
+    {
+        var id = $"filter-{Draft.Config.Filters.Count + 1}";
+        Draft.Config.Filters.Add(new FilterConfig { Id = id, LabelKey = $"filter.{id}", Type = "segmented" });
+        Notify();
+    }
+
+    private void SetStringFeature(FeatureBinding binding, ChangeEventArgs e)
+    {
+        binding.SetValue(Draft.Config.Features, e.Value?.ToString() ?? "");
+        _ = Notify();
+    }
+
+    private async Task Notify() => await OnChanged.InvokeAsync();
+}

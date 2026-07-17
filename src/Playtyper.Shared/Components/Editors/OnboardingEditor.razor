@@ -1,0 +1,159 @@
+@* Introduktion: Onboarding, Tutorial, Badges. GAPS.md §4:s näst högsta
+   prioritet efter SituationEditor.razor. *@
+
+<div class="editor-pane editor-pane--wide">
+
+    <h3>Onboarding <span class="count-badge">@Draft.Config.Onboarding.Count</span></h3>
+    <p class="section-hint">Skärmar som visas första gången appen öppnas, i ordning.</p>
+    <div class="stack-list">
+        @foreach (var slide in Draft.Config.Onboarding)
+        {
+            <div class="card stack-item">
+                <div class="field-grid">
+                    <div>
+                        <label>Emoji</label>
+                        <input @bind="slide.Emoji" @bind:event="oninput" @bind:after="Notify" style="width:60px;text-align:center" />
+                    </div>
+                    <div>
+                        <label>Id</label>
+                        <input @bind="slide.Id" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div>
+                        <label>Typ</label>
+                        <input @bind="slide.Type" @bind:event="oninput" @bind:after="Notify" placeholder="info" />
+                    </div>
+                    <div>
+                        <label>Inställnings-nyckel <span class="field-note">(valfri)</span></label>
+                        <input value="@slide.PrefKey" @onchange="e => { slide.PrefKey = e.Value?.ToString(); Notify(); }" placeholder="lämna tom om ej relevant" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Rubrik</label>
+                        <input @bind="slide.TitleKey" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Brödtext</label>
+                        <input @bind="slide.BodyKey" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                </div>
+
+                <label class="field-note" style="display:block;margin-top:8px">Valmöjligheter (om den här skärmen frågar något, t.ex. i onboarding-typen "choice")</label>
+                <div class="stack-list stack-list--nested">
+                    @foreach (var opt in slide.Options)
+                    {
+                        <div class="dict-row">
+                            <input value="@opt.Value" placeholder="värde" @onchange="e => { opt.Value = e.Value?.ToString() ?? ""; Notify(); }" style="width:38%" />
+                            <input value="@opt.LabelKey" placeholder="etikett" @onchange="e => { opt.LabelKey = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+                            <button class="ghost" @onclick="() => { slide.Options.Remove(opt); Notify(); }">✕</button>
+                        </div>
+                    }
+                    <button class="ghost dict-editor__add" @onclick="() => { slide.Options.Add(new FilterOption()); Notify(); }">+ Val</button>
+                </div>
+                <button class="ghost stack-item__remove" @onclick="() => { Draft.Config.Onboarding.Remove(slide); Notify(); }">Ta bort skärm</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="AddOnboardingSlide">+ Onboarding-skärm</button>
+
+    <h3 style="margin-top:28px">Handledning <span class="count-badge">@Draft.Config.Tutorial.Count</span></h3>
+    <p class="section-hint">Lättare syskon till onboarding — bara emoji/rubrik/text, ingen förgrening.</p>
+    <div class="stack-list">
+        @foreach (var slide in Draft.Config.Tutorial)
+        {
+            <div class="card stack-item">
+                <div class="field-grid">
+                    <div>
+                        <label>Emoji</label>
+                        <input @bind="slide.Emoji" @bind:event="oninput" @bind:after="Notify" style="width:60px;text-align:center" />
+                    </div>
+                    <div style="grid-column:2">
+                        <label>Rubrik</label>
+                        <input @bind="slide.TitleKey" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Brödtext</label>
+                        <input @bind="slide.BodyKey" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                </div>
+                <button class="ghost stack-item__remove" @onclick="() => { Draft.Config.Tutorial.Remove(slide); Notify(); }">Ta bort</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="() => { Draft.Config.Tutorial.Add(new TutorialSlide()); Notify(); }">+ Handledningsskärm</button>
+
+    <h3 style="margin-top:28px">Badges <span class="count-badge">@Draft.Config.Badges.Count</span></h3>
+    <p class="section-hint">Utvärderas av BadgeService efter varje avbockning. Kräver features.badges = true (se Innehåll-fliken).</p>
+    <div class="stack-list">
+        @foreach (var badge in Draft.Config.Badges)
+        {
+            <div class="card stack-item">
+                <div class="field-grid">
+                    <div>
+                        <label>Emoji</label>
+                        <input @bind="badge.Emoji" @bind:event="oninput" @bind:after="Notify" style="width:60px;text-align:center" />
+                    </div>
+                    <div>
+                        <label>Id</label>
+                        <input @bind="badge.Id" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Namn</label>
+                        <input @bind="badge.NameKey" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Beskrivning <span class="field-note">(valfri)</span></label>
+                        <input value="@badge.DescriptionKey" @onchange="e => { badge.DescriptionKey = e.Value?.ToString(); Notify(); }" />
+                    </div>
+                    <div>
+                        <label>Utlöses av</label>
+                        <input @bind="badge.Trigger.Type" @bind:event="oninput" @bind:after="Notify" placeholder="t.ex. doneCount" />
+                    </div>
+                    <div>
+                        <label>Tröskelvärde</label>
+                        <input type="number" @bind="badge.Trigger.Threshold" @bind:after="Notify" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Begränsad till kategori <span class="field-note">(valfritt — tom = alla kategorier)</span></label>
+                        <select value="@badge.Trigger.Category" @onchange="e => { badge.Trigger.Category = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value!.ToString(); Notify(); }">
+                            <option value="">– alla kategorier –</option>
+                            @foreach (var cat in Draft.Config.Categories)
+                            {
+                                <option value="@cat.Id">@cat.Emoji @cat.LabelKey</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <button class="ghost stack-item__remove" @onclick="() => { Draft.Config.Badges.Remove(badge); Notify(); }">Ta bort</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="() => { Draft.Config.Badges.Add(new BadgeDefinition { Id = $"badge-{Draft.Config.Badges.Count + 1}" }); Notify(); }">+ Badge</button>
+</div>
+
+<style>
+    .editor-pane { padding: 20px 24px 60px; max-width: 720px; }
+    .editor-pane--wide { max-width: 860px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
+    .field-note { color: var(--color-text-muted); font-size: 12px; }
+    .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
+    .stack-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .stack-list--nested { margin-top: 6px; }
+    .stack-item { padding: 12px; }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    .dict-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .dict-editor__add { font-size: 12px; padding: 4px 10px; }
+    @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void AddOnboardingSlide()
+    {
+        Draft.Config.Onboarding.Add(new OnboardingSlide { Id = $"onboard-{Draft.Config.Onboarding.Count + 1}" });
+        Notify();
+    }
+
+    private void Notify() => OnChanged.InvokeAsync();
+}

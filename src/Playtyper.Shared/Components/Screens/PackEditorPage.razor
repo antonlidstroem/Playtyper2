@@ -1,0 +1,249 @@
+@page "/pack/{PackId}"
+@inject AppState State
+@inject NavigationManager Nav
+@inject LocalDraftCache DraftCache
+
+@if (_loading)
+{
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh">
+        <p><span class="spinner"></span> Läser in @PackId…</p>
+    </div>
+}
+else if (_loadError != null)
+{
+    <div style="max-width:480px;margin:60px auto;text-align:center">
+        <p class="apps-page__error">@_loadError</p>
+        <button @onclick='() => Nav.NavigateTo("apps/browse")'>Tillbaka</button>
+    </div>
+}
+else if (_draft != null)
+{
+    <AppShell Title="@_draft.PackId" RepoName="@(State.Repo?.OwnerRepo ?? "")"
+              IsDirty="@_isDirty" Saving="@_saving"
+              OnSave="SaveAsync" OnShowDiff="() => _showDiff = true"
+              Tabs="_tabs" ActiveTab="@_activeTab" OnTabChanged="tab => _activeTab = tab">
+        <ChildContent>
+            @switch (_activeTab)
+            {
+                case "identity":
+                    <IdentityEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "tokens":
+                    <TokenEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "activities":
+                    <ActivityTable Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "content":
+                    <ContentEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "situations":
+                    <SituationEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "onboarding":
+                    <OnboardingEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "appearance":
+                    <AppearanceEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "backends":
+                    <BackendsEditor Draft="_draft" OnChanged="OnDraftChanged" />
+                    break;
+                case "advanced":
+                    <AdvancedJsonEditor Draft="_draft" Repo="State.Repo!" OnChanged="OnDraftChanged" />
+                    break;
+            }
+        </ChildContent>
+        <PreviewContent>
+            <PreviewPanel Draft="_draft" />
+        </PreviewContent>
+    </AppShell>
+
+    @if (_showDiff)
+    {
+        <div class="modal-backdrop" @onclick="() => _showDiff = false">
+            <div class="modal card" style="max-width:720px" @onclick:stopPropagation="true">
+                <DiffView Draft="_draft" Repo="State.Repo!" />
+                <div style="display:flex;justify-content:flex-end;margin-top:12px">
+                    <button @onclick="() => _showDiff = false">Stäng</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_recoveredDraftPrompt)
+    {
+        <div class="modal-backdrop">
+            <div class="modal card">
+                <h3>Osparat utkast hittades</h3>
+                <p style="color:var(--color-text-secondary)">
+                    Det finns ändringar från @_recoveredAt?.ToString("g") som aldrig sparades till GitHub
+                    (t.ex. om fliken stängdes av misstag). Vill du återuppta dem?
+                </p>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                    <button @onclick="DiscardRecoveredDraft">Kasta utkastet</button>
+                    <button class="primary" @onclick="ApplyRecoveredDraft">Återuppta</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string PackId { get; set; } = "";
+
+    private bool _loading = true;
+    private string? _loadError;
+    private PackDraft? _draft;
+    private bool _isDirty;
+    private bool _saving;
+    private string _activeTab = "identity";
+    private bool _showDiff;
+
+    private bool _recoveredDraftPrompt;
+    private DateTimeOffset? _recoveredAt;
+    private string? _recoveredJson;
+
+    private readonly List<AppShell.TabInfo> _tabs = new()
+    {
+        new("identity",    "Identitet",         "🪪"),
+        new("tokens",      "Tokens",            "🎨"),
+        new("activities",  "Aktiviteter",       "📋"),
+        new("content",     "Innehåll",          "🗂️"),
+        new("situations",  "Läge & genvägar",   "⚡"),
+        new("onboarding",  "Introduktion",      "👋"),
+        new("appearance",  "Utseende",          "🖌️"),
+        new("backends",    "Backend & inloggning", "🔌"),
+        new("advanced",    "Avancerat",         "{ }"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.Repo == null)
+        {
+            Nav.NavigateTo("apps");
+            return;
+        }
+
+        try
+        {
+            _draft = await PackDraftStore.LoadAsync(State.Repo, PackId);
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Kunde inte läsa in \"{PackId}\": {ex.Message}";
+            _loading = false;
+            return;
+        }
+
+        var cached = await DraftCache.LoadAsync(State.Repo.OwnerRepo, PackId);
+        if (cached != null)
+        {
+            _recoveredAt = cached.Value.SavedAt;
+            _recoveredJson = cached.Value.Json;
+            _recoveredDraftPrompt = true;
+        }
+
+        State.SetActiveDraft(_draft);
+        _loading = false;
+    }
+
+    private void OnDraftChanged()
+    {
+        _isDirty = _draft!.IsDirty(State.Repo!);
+        _ = PersistToCacheAsync();
+        StateHasChanged();
+    }
+
+    private async Task PersistToCacheAsync()
+    {
+        if (_draft == null || State.Repo == null) return;
+        var files = _draft.ToFiles(State.Repo);
+        var json = System.Text.Json.JsonSerializer.Serialize(files);
+        await DraftCache.SaveAsync(State.Repo.OwnerRepo, PackId, json);
+        await DraftCache.SetUnsavedFlagAsync(_isDirty);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_draft == null || State.Repo == null) return;
+        _saving = true;
+        StateHasChanged();
+
+        var result = await PackDraftStore.CommitAsync(State.Repo, _draft, $"edit: {PackId} via Playtyper");
+        _saving = false;
+
+        if (result.Success)
+        {
+            _isDirty = false;
+            await DraftCache.DeleteAsync(State.Repo.OwnerRepo, PackId);
+            await DraftCache.SetUnsavedFlagAsync(false);
+        }
+        else
+        {
+            _loadError = null; // visa felet inline istället för att byta hela vyn
+            await Js_AlertFallback(result.Error ?? "Okänt fel vid sparning.");
+        }
+        StateHasChanged();
+    }
+
+    [Inject] private Microsoft.JSInterop.IJSRuntime Js { get; set; } = default!;
+    private async Task Js_AlertFallback(string message)
+    {
+        try { await Js.InvokeVoidAsync("alert", message); } catch { }
+    }
+
+    private void ApplyRecoveredDraft()
+    {
+        if (_recoveredJson != null && State.Repo != null)
+        {
+            var files = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(_recoveredJson)!;
+            // Skriv över det just inlästa draftets fält med det cachade innehållet genom
+            // att köra samma parsing-logik som PackDraftStore.LoadAsync, fast mot cachen
+            // istället för GitHub - enklast genom att bygga om draftet från filerna.
+            _draft = RebuildDraftFromFiles(PackId, files);
+            _isDirty = _draft.IsDirty(State.Repo);
+        }
+        _recoveredDraftPrompt = false;
+    }
+
+    private async Task DiscardRecoveredDraft()
+    {
+        if (State.Repo != null) await DraftCache.DeleteAsync(State.Repo.OwnerRepo, PackId);
+        _recoveredDraftPrompt = false;
+    }
+
+    private PackDraft RebuildDraftFromFiles(string packId, Dictionary<string, string> files)
+    {
+        var packDir = State.Repo!.PackDir(packId);
+        var config = System.Text.Json.JsonSerializer.Deserialize<PackConfig>(
+            files.GetValueOrDefault($"{packDir}/pack.config.json", "{}"))!;
+
+        var activities = new Dictionary<string, List<Activity>>();
+        var translations = new Dictionary<string, Dictionary<string, string>>();
+        foreach (var (path, content) in files)
+        {
+            if (path.Contains("/activities.") && path.EndsWith(".json"))
+            {
+                var lang = path.Split("activities.")[1].Replace(".json", "");
+                activities[lang] = System.Text.Json.JsonSerializer.Deserialize<List<Activity>>(content) ?? new();
+            }
+            else if (path.Contains("/translations.") && path.EndsWith(".json"))
+            {
+                var lang = path.Split("translations.")[1].Replace(".json", "");
+                translations[lang] = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(content) ?? new();
+            }
+        }
+
+        return new PackDraft
+        {
+            PackId = packId,
+            Config = config,
+            ActivitiesByLang = activities,
+            TranslationsByLang = translations,
+            ThemeLight = PackDraft.ThemeFromCss(files.GetValueOrDefault($"{packDir}/theme.css", ":root{}")),
+            ThemeDark = PackDraft.ThemeFromCss(files.GetValueOrDefault($"{packDir}/theme-dark.css", ":root{}")),
+            OriginalFiles = _draft!.OriginalFiles, // ursprunget är fortfarande det som faktiskt ligger på GitHub
+        };
+    }
+}

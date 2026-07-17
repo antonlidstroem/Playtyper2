@@ -1,0 +1,233 @@
+@page "/apps"
+@inject AppState State
+@inject ICredentialStore Credentials
+@inject IAppHistoryStore History
+@inject NavigationManager Nav
+
+<div class="apps-page">
+    <div class="apps-page__header">
+        <img src="_content/Playtyper.Shared/img/logo.png" alt="" class="apps-page__logo" />
+        <div style="flex:1">
+            <h2>Mina appar</h2>
+            <p style="color:var(--color-text-secondary);margin:0">Inloggad som @State.Login</p>
+        </div>
+        <button class="ghost" @onclick="SignOut">Logga ut</button>
+    </div>
+
+    @if (_loading)
+    {
+        <p><span class="spinner"></span> Hämtar dina appar…</p>
+    }
+    else
+    {
+        <div class="apps-page__grid">
+            <button class="apps-page__card apps-page__card--new" @onclick="() => _showCreateForm = true">
+                <span style="font-size:28px">＋</span>
+                <span>Skapa ny app</span>
+            </button>
+
+            @foreach (var app in _apps)
+            {
+                <button class="apps-page__card" @onclick="() => OpenAsync(app.OwnerRepo, app.Type)">
+                    <strong>@(app.AppName ?? app.OwnerRepo)</strong>
+                    <span style="color:var(--color-text-muted);font-size:12px">@app.OwnerRepo</span>
+                    <span style="color:var(--color-text-muted);font-size:11px">senast öppnad @FormatAge(app.LastUsedUtc)</span>
+                </button>
+            }
+        </div>
+
+        @if (_apps.Count == 0)
+        {
+            <p style="color:var(--color-text-secondary)">Inga appar än — skapa din första ovan, eller anslut till ett repo du redan har.</p>
+        }
+
+        <button class="ghost" style="margin-top:8px" @onclick="() => _showConnectForm = true">
+            Anslut till ett befintligt repo (org/repo)
+        </button>
+    }
+
+    @if (_error != null)
+    {
+        <p class="apps-page__error"><span class="badge badge-danger">Fel</span> @_error</p>
+    }
+</div>
+
+@if (_showCreateForm)
+{
+    <div class="modal-backdrop" @onclick="() => _showCreateForm = false">
+        <div class="modal card" @onclick:stopPropagation="true">
+            <h3>Nytt kund-repo</h3>
+            <label>Kund-ID <span style="color:var(--color-text-muted)">(kebab-case, t.ex. borasstad)</span></label>
+            <input @bind="_newCustomerId" @bind:event="oninput" placeholder="borasstad" />
+
+            <label style="margin-top:10px">App-namn</label>
+            <input @bind="_newAppName" @bind:event="oninput" placeholder="Borås Stad" />
+
+            <label style="margin-top:10px">Android package-namn</label>
+            <input @bind="_newAppId" placeholder="@SuggestedAppId" />
+
+            <label style="margin-top:10px">Accentfärg</label>
+            <input type="color" @bind="_newAccentColor" />
+
+            <label style="margin-top:10px">GitHub-repo-namn</label>
+            <input @bind="_newRepoName" placeholder="@SuggestedRepoName" />
+
+            <label style="margin-top:10px">Organisation <span style="color:var(--color-text-muted)">(tomt = ditt eget konto)</span></label>
+            <input @bind="_newOrg" />
+
+            <label style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                <input type="checkbox" style="width:auto" @bind="_newIsPrivate" /> Privat repo (rekommenderas)
+            </label>
+
+            @if (_error != null)
+            {
+                <p class="apps-page__error">@_error</p>
+            }
+
+            <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+                <button class="ghost" @onclick="() => _showCreateForm = false" disabled="@_creating">Avbryt</button>
+                <button class="primary" @onclick="CreateAsync" disabled="@(_creating || string.IsNullOrWhiteSpace(_newCustomerId) || string.IsNullOrWhiteSpace(_newAppName))">
+                    @if (_creating) { <span class="spinner"></span> } else { <text>Skapa</text> }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showConnectForm)
+{
+    <div class="modal-backdrop" @onclick="() => _showConnectForm = false">
+        <div class="modal card" @onclick:stopPropagation="true">
+            <h3>Anslut till befintligt repo</h3>
+            <label>org/repo</label>
+            <input @bind="_connectOwnerRepo" placeholder="dittnamn/kundapp-repo" />
+            @if (_error != null)
+            {
+                <p class="apps-page__error">@_error</p>
+            }
+            <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+                <button class="ghost" @onclick="() => _showConnectForm = false" disabled="@_creating">Avbryt</button>
+                <button class="primary" @onclick="ConnectAsync" disabled="@(_creating || string.IsNullOrWhiteSpace(_connectOwnerRepo))">
+                    @if (_creating) { <span class="spinner"></span> } else { <text>Anslut</text> }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _creating;
+    private string? _error;
+    private List<KnownApp> _apps = new();
+
+    private bool _showCreateForm;
+    private bool _showConnectForm;
+
+    private string? _newCustomerId;
+    private string? _newAppName;
+    private string? _newAppId;
+    private string _newAccentColor = "#2F6F4F";
+    private string? _newRepoName;
+    private string? _newOrg;
+    private bool _newIsPrivate = true;
+
+    private string _connectOwnerRepo = "";
+
+    private string SuggestedAppId => GitHubOperator.SuggestAppId(_newCustomerId ?? "");
+    private string SuggestedRepoName => GitHubOperator.SuggestRepoName(_newCustomerId ?? "");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(State.Token))
+        {
+            Nav.NavigateTo("connect");
+            return;
+        }
+        _apps = (await History.ListAsync()).ToList();
+        _loading = false;
+    }
+
+    private async Task OpenAsync(string ownerRepo, string type)
+    {
+        _error = null;
+        var result = await GitHubOperator.ConnectKnownAsync(State.Token!, ownerRepo, type);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        await History.RecordAsync(ownerRepo, result.Repo!.Type.ToString());
+        State.SetRepo(result.Repo!);
+        Nav.NavigateTo("apps/browse");
+    }
+
+    private async Task CreateAsync()
+    {
+        _creating = true;
+        _error = null;
+        StateHasChanged();
+
+        var request = new GitHubOperator.NewAppRequest(
+            CustomerId: _newCustomerId!.Trim(),
+            AppName: _newAppName!.Trim(),
+            AppId: string.IsNullOrWhiteSpace(_newAppId) ? GitHubOperator.SuggestAppId(_newCustomerId) : _newAppId.Trim(),
+            AccentColor: _newAccentColor,
+            RepoName: string.IsNullOrWhiteSpace(_newRepoName) ? GitHubOperator.SuggestRepoName(_newCustomerId) : _newRepoName.Trim(),
+            Org: _newOrg,
+            Private: _newIsPrivate);
+
+        var result = await GitHubOperator.CreateCustomerRepoAsync(State.Token!, State.Login!, request);
+
+        if (result.Outcome == GitHubOperator.CreateOutcome.Failed)
+        {
+            _error = result.Error;
+            _creating = false;
+            return;
+        }
+
+        await History.RecordAsync(result.Repo!.OwnerRepo, result.Repo.Type.ToString(), _newAppName);
+        State.SetRepo(result.Repo);
+        _showCreateForm = false;
+        _creating = false;
+        Nav.NavigateTo("apps/browse");
+    }
+
+    private async Task ConnectAsync()
+    {
+        _creating = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await GitHubOperator.ConnectExistingAsync(State.Token!, _connectOwnerRepo!.Trim());
+        if (!result.Success)
+        {
+            _error = result.Error;
+            _creating = false;
+            return;
+        }
+
+        await History.RecordAsync(result.Repo!.OwnerRepo, result.Repo.Type.ToString());
+        State.SetRepo(result.Repo);
+        _showConnectForm = false;
+        _creating = false;
+        Nav.NavigateTo("apps/browse");
+    }
+
+    private async Task SignOut()
+    {
+        await Credentials.ClearTokenAsync();
+        State.SignOut();
+        Nav.NavigateTo("connect");
+    }
+
+    private static string FormatAge(DateTimeOffset at)
+    {
+        var span = DateTimeOffset.UtcNow - at;
+        if (span.TotalMinutes < 1) return "just nu";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} min sedan";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} tim sedan";
+        if (span.TotalDays < 30) return $"{(int)span.TotalDays} dagar sedan";
+        return at.ToString("yyyy-MM-dd");
+    }
+}

@@ -1,0 +1,122 @@
+@page "/"
+@page "/connect"
+@inject ICredentialStore Credentials
+@inject NavigationManager Nav
+@inject AppState State
+
+<div class="connect-page">
+    <div class="connect-page__card card">
+        <img src="_content/Playtyper.Shared/img/logo.png" alt="Playtyper" class="connect-page__logo" />
+
+        @if (_checkingSaved)
+        {
+            <p><span class="spinner"></span> Kontrollerar sparad inloggning…</p>
+        }
+        else
+        {
+            <h2>Anslut till GitHub</h2>
+            <p style="color:var(--color-text-secondary)">
+                Playtyper skriver aldrig till en egen server — allt (packs, bundle, CI-workflow)
+                läses och skrivs direkt mot GitHub med ett Personal Access Token. Token lagras
+                bara för den här sessionen (rensas när du stänger fliken).
+            </p>
+
+            <details class="connect-page__howto" open="@(_error != null)">
+                <summary>Så skapar du ett token (under en minut)</summary>
+                <ol>
+                    <li>github.com → din profilbild → <strong>Settings</strong></li>
+                    <li><strong>Developer settings</strong> (längst ner i vänstermenyn)</li>
+                    <li><strong>Personal access tokens → Fine-grained tokens → Generate new token</strong></li>
+                    <li>Resource owner: dig själv, eller din organisation</li>
+                    <li>Repository access: <strong>"All repositories"</strong> — krävs för att Playtyper ska kunna skapa nya kund-repon åt dig, inte bara redigera befintliga</li>
+                    <li>Permissions → Repository permissions:
+                        <ul>
+                            <li><code>Contents</code> → Read and write</li>
+                            <li><code>Workflows</code> → Read and write</li>
+                            <li><code>Administration</code> → Read and write</li>
+                            <li><code>Secrets</code> → Read and write</li>
+                        </ul>
+                    </li>
+                    <li>Generate token → kopiera värdet (visas bara en gång)</li>
+                </ol>
+            </details>
+
+            <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+                <label for="pat">GitHub Personal Access Token</label>
+                <input id="pat" type="text" placeholder="github_pat_…" @bind="_token" @bind:event="oninput"
+                       autocomplete="off" spellcheck="false" disabled="@_validating" />
+
+                @if (_error != null)
+                {
+                    <p class="connect-page__error"><span class="badge badge-danger">Fel</span> @_error</p>
+                }
+
+                <button type="submit" class="primary" disabled="@(_validating || string.IsNullOrWhiteSpace(_token))" style="margin-top:12px;width:100%;">
+                    @if (_validating)
+                    {
+                        <span class="spinner"></span> <text>Validerar…</text>
+                    }
+                    else
+                    {
+                        <text>Anslut</text>
+                    }
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<style>
+    .connect-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .connect-page__card { max-width: 440px; width: 100%; }
+    .connect-page__logo { height: 56px; margin-bottom: 12px; }
+    .connect-page__howto { margin: 14px 0; font-size: 13px; color: var(--color-text-secondary); }
+    .connect-page__howto summary { cursor: pointer; color: var(--color-accent); font-weight: 600; }
+    .connect-page__howto ol { padding-left: 20px; }
+    .connect-page__howto code { background: var(--color-surface-2); padding: 1px 5px; border-radius: 4px; }
+    .connect-page__error { color: var(--color-danger-text); font-size: 13px; }
+</style>
+
+@code {
+    private bool _checkingSaved = true;
+    private bool _validating;
+    private string _token = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var saved = await Credentials.GetTokenAsync();
+        if (!string.IsNullOrWhiteSpace(saved))
+        {
+            var result = await GitHubOperator.ValidateTokenAsync(saved);
+            if (result.Valid)
+            {
+                State.SetSession(result.Login!, saved);
+                _checkingSaved = false;
+                Nav.NavigateTo("apps");
+                return;
+            }
+            await Credentials.ClearTokenAsync();
+        }
+        _checkingSaved = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _validating = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await GitHubOperator.ValidateTokenAsync(_token.Trim());
+        if (!result.Valid)
+        {
+            _error = result.Error ?? "Token fungerar inte — kontrollera att det klistrades in helt.";
+            _validating = false;
+            return;
+        }
+
+        await Credentials.SetTokenAsync(_token.Trim());
+        State.SetSession(result.Login!, _token.Trim());
+        Nav.NavigateTo("apps");
+    }
+}

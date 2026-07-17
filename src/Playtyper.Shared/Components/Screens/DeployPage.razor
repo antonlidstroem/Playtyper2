@@ -1,0 +1,445 @@
+@page "/apps/deploy"
+@inject AppState State
+@inject NavigationManager Nav
+
+@*
+    Driftsättning — GAPS.md §5, first bullet (was named-but-unimplemented as
+    GitHubOperator.CreateDeployTagAsync). Repo-level, not pack-level — same
+    reason PackListPage links here rather than PackEditorPage: a deploy tag
+    covers whatever the bundle currently points at, not one specific pack.
+
+    Two independent steps, shown as two sections because they genuinely are
+    separate GitHub-API operations a person may redo independently of each
+    other (e.g. add Android support to an already-web-deployed app: touches
+    only the workflow section, not a new tag for web):
+      1. Make sure .github/workflows/deploy.yml exists and is configured
+         (GitHubOperator.EnsureDeployWorkflowAsync) — a one-time-ish setup
+         step, re-run only when settings change.
+      2. Create a "{platform}/v{version}" tag, which is what deploy.yml's
+         own `on.push.tags` trigger actually reacts to
+         (GitHubOperator.CreateDeployTagAsync) — the thing you do every
+         time you actually want to ship what's currently in the bundle.
+*@
+
+<div class="apps-page">
+    <div class="apps-page__header">
+        <button class="ghost" @onclick='() => Nav.NavigateTo("apps/browse")'>← Packs</button>
+        <div style="flex:1">
+            <h2>Driftsättning</h2>
+            <p style="color:var(--color-text-secondary);margin:0">@(State.Repo?.OwnerRepo)</p>
+        </div>
+    </div>
+
+    @if (State.Repo == null)
+    {
+        <p>Inget repo öppet. <a href="apps">Gå tillbaka</a>.</p>
+    }
+    else
+    {
+        <div class="deploy-section card">
+            <h3>Redo att driftsätta?</h3>
+            @if (_loadingReadiness)
+            {
+                <p><span class="spinner"></span> Kontrollerar bundle och packs…</p>
+            }
+            else if (_readiness != null)
+            {
+                @if (_readiness.Ready)
+                {
+                    <p><span class="badge badge-success">Redo</span> Bundlen pekar på packs som validerar rent.</p>
+                }
+                else
+                {
+                    <p><span class="badge badge-warning">Ofullständigt</span> Det går fortfarande att generera arbetsflöde och skapa taggar — men appen som driftsätts blir tom eller trasig tills det här är åtgärdat.</p>
+                    <ul class="deploy-warnings">
+                        @foreach (var w in _readiness.Warnings)
+                        {
+                            <li>@w</li>
+                        }
+                    </ul>
+                    @foreach (var broken in _readiness.BrokenPacks)
+                    {
+                        <div class="deploy-broken-pack">
+                            <strong>@broken.PackId</strong>
+                            <ul>
+                                @foreach (var e in broken.Errors)
+                                {
+                                    <li>@e</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                }
+            }
+        </div>
+
+        <div class="deploy-section card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <h3 style="margin:0">GitHub Actions-arbetsflöde</h3>
+                @if (!_loadingWorkflowStatus)
+                {
+                    @if (_workflowExists)
+                    {
+                        <span class="badge badge-success">Konfigurerat</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-neutral">Saknas</span>
+                    }
+                }
+            </div>
+
+            @if (_loadingWorkflowStatus)
+            {
+                <p><span class="spinner"></span> Läser av repot…</p>
+            }
+            else
+            {
+                @if (_workflowExists && !_showWorkflowForm)
+                {
+                    <p style="color:var(--color-text-secondary)">
+                        <code>@State.Repo.WorkflowFile</code> finns.
+                        <a href="@State.Repo.FileUrl(State.Repo.WorkflowFile)" target="_blank" rel="noopener">Visa på GitHub</a>
+                    </p>
+                    <button class="ghost" @onclick="ShowWorkflowFormForEditing">Uppdatera inställningar</button>
+                }
+                else
+                {
+                    <div class="field-grid">
+                        <div style="grid-column:1/-1">
+                            <label><input type="checkbox" @bind="_wfDeployWeb" /> Web (Cloudflare Pages)</label>
+                        </div>
+                        <div style="grid-column:1/-1">
+                            <label><input type="checkbox" @bind="_wfDeployAndroid" /> Android (GitHub Release, .aab)</label>
+                        </div>
+
+                        <div>
+                            <label>Playtypus-ramverksrepo</label>
+                            <input @bind="_wfPlaytypusRepo" placeholder="org/playtypus" />
+                        </div>
+                        <div>
+                            <label>Ref (branch/tagg)</label>
+                            <input @bind="_wfPlaytypusRef" placeholder="main" />
+                        </div>
+
+                        @if (_wfDeployWeb)
+                        {
+                            <div style="grid-column:1/-1">
+                                <label>Cloudflare Pages-projektnamn</label>
+                                <input @bind="_wfCloudflareProject" placeholder="playtypus-kundnamn" />
+                            </div>
+                        }
+                        @if (_wfDeployAndroid)
+                        {
+                            <div style="grid-column:1/-1">
+                                <label>Android-paket-id</label>
+                                <input @bind="_wfAndroidPackage" placeholder="se.playtypus.app" />
+                            </div>
+                        }
+                    </div>
+
+                    <h4 style="margin-top:20px;margin-bottom:4px">Secrets</h4>
+                    <p style="font-size:12px;color:var(--color-text-muted);margin-top:0">
+                        Lämna ett fält tomt för att låta ett redan satt secret vara oförändrat.
+                    </p>
+                    <div class="field-grid">
+                        <div style="grid-column:1/-1">
+                            <label>PLAYTYPUS_TOKEN <span style="color:var(--color-text-muted)">— GitHub PAT, Contents:Read på ramverksrepot</span></label>
+                            <input type="password" @bind="_wfPlaytypusToken" autocomplete="off" />
+                        </div>
+                        @if (_wfDeployWeb)
+                        {
+                            <div>
+                                <label>CLOUDFLARE_API_TOKEN</label>
+                                <input type="password" @bind="_wfCloudflareApiToken" autocomplete="off" />
+                            </div>
+                            <div>
+                                <label>CLOUDFLARE_ACCOUNT_ID</label>
+                                <input type="password" @bind="_wfCloudflareAccountId" autocomplete="off" />
+                            </div>
+                        }
+                        @if (_wfDeployAndroid)
+                        {
+                            <div style="grid-column:1/-1">
+                                <label>ANDROID_KEYSTORE_BASE64 <span style="color:var(--color-text-muted)">— base64 av en befintlig .jks (genereras inte här, se README)</span></label>
+                                <textarea @bind="_wfAndroidKeystoreBase64" rows="3" style="width:100%;font-family:monospace;font-size:11px"></textarea>
+                            </div>
+                            <div>
+                                <label>ANDROID_KEY_ALIAS</label>
+                                <input type="password" @bind="_wfAndroidKeyAlias" autocomplete="off" />
+                            </div>
+                            <div>
+                                <label>ANDROID_KEY_PASSWORD</label>
+                                <input type="password" @bind="_wfAndroidKeyPassword" autocomplete="off" />
+                            </div>
+                            <div>
+                                <label>ANDROID_KEYSTORE_PASSWORD</label>
+                                <input type="password" @bind="_wfAndroidKeystorePassword" autocomplete="off" />
+                            </div>
+                        }
+                    </div>
+
+                    <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+                        <button class="primary" disabled="@(_savingWorkflow || !CanSaveWorkflow)" @onclick="SaveWorkflowAsync">
+                            @(_savingWorkflow ? "Sparar…" : (_workflowExists ? "Uppdatera arbetsflöde" : "Generera arbetsflöde"))
+                        </button>
+                        @if (_workflowExists)
+                        {
+                            <button class="ghost" disabled="@_savingWorkflow" @onclick="() => _showWorkflowForm = false">Avbryt</button>
+                        }
+                    </div>
+
+                    @if (!CanSaveWorkflow)
+                    {
+                        <p style="font-size:12px;color:var(--color-text-muted)">Fyll i ramverksrepo, ref@(_wfDeployWeb ? " och Cloudflare-projektnamn" : "") för att fortsätta.</p>
+                    }
+                }
+
+                @if (_workflowResult != null)
+                {
+                    @if (_workflowResult.Success)
+                    {
+                        <div class="deploy-result deploy-result--ok">
+                            <p>✓ @State.Repo.WorkflowFile sparat.</p>
+                            @if (_workflowResult.SecretResults.Count > 0)
+                            {
+                                <ul>
+                                    @foreach (var s in _workflowResult.SecretResults)
+                                    {
+                                        <li>@(s.Success ? "✓" : "✗") @s.SecretName @(s.Error != null ? $"— {s.Error}" : "")</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="deploy-result deploy-result--error">
+                            <p>✗ @_workflowResult.Error</p>
+                        </div>
+                    }
+                }
+            }
+        </div>
+
+        <div class="deploy-section card">
+            <h3>Skapa driftsättningstagg</h3>
+            <p style="color:var(--color-text-secondary)">
+                Skapar en tagg direkt på GitHub. Det är taggen — inte den här sidan — som faktiskt
+                startar bygget, via <code>on.push.tags</code> i @State.Repo.WorkflowFile.
+            </p>
+
+            <div class="field-grid">
+                <div>
+                    <label>Plattform</label>
+                    <select value="@_tagPlatform" @onchange="OnTagPlatformChanged">
+                        <option value="web">web</option>
+                        <option value="android">android</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Version</label>
+                    <input @bind="_tagVersion" placeholder="1.0.0" disabled="@_loadingSuggestedVersion" />
+                </div>
+            </div>
+
+            <div style="margin-top:14px">
+                <button class="primary" disabled="@(_creatingTag || string.IsNullOrWhiteSpace(_tagVersion))" @onclick="CreateTagAsync">
+                    @(_creatingTag ? "Skapar tagg…" : $"Skapa tagg {_tagPlatform}/v{_tagVersion}")
+                </button>
+            </div>
+
+            @if (_tagResult != null)
+            {
+                @if (_tagResult.Success)
+                {
+                    <div class="deploy-result deploy-result--ok">
+                        <p>✓ @_tagResult.TagName skapad. Bygget startar automatiskt.</p>
+                        <p><a href="@State.Repo.ActionsUrl" target="_blank" rel="noopener">Följ bygget på GitHub Actions →</a></p>
+                        @if (_tagPlatform == "web" && !string.IsNullOrWhiteSpace(_wfCloudflareProject))
+                        {
+                            <p style="color:var(--color-text-secondary)">
+                                Väntas bli live på: <code>https://@(_wfCloudflareProject).pages.dev</code>
+                                (inom ett par minuter — inte bekräftat mot Cloudflare, bara det förväntade mönstret)
+                            </p>
+                        }
+                        @if (_tagPlatform == "android")
+                        {
+                            <p style="color:var(--color-text-secondary)">.aab-filen hamnar under GitHub Releases när bygget är klart.</p>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="deploy-result deploy-result--error">
+                        <p>✗ @_tagResult.Error</p>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .deploy-section { margin-bottom: 18px; }
+    .deploy-warnings { margin: 8px 0; padding-left: 20px; color: var(--color-warning-text); }
+    .deploy-broken-pack { margin-top: 10px; padding: 10px 12px; background: var(--color-surface-2); border-radius: var(--radius-sm); }
+    .deploy-broken-pack ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-text-secondary); }
+    .deploy-result { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-sm); }
+    .deploy-result--ok { background: var(--color-success-bg); color: var(--color-success-text); }
+    .deploy-result--error { background: var(--color-danger-bg); color: var(--color-danger-text); }
+    .deploy-result p { margin: 0 0 6px; }
+    .deploy-result ul { margin: 6px 0 0; padding-left: 18px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    private bool _loadingReadiness = true;
+    private GitHubOperator.DeployReadinessResult? _readiness;
+
+    private bool _loadingWorkflowStatus = true;
+    private bool _workflowExists;
+    private bool _showWorkflowForm;
+
+    private bool _wfDeployWeb = true;
+    private bool _wfDeployAndroid;
+    private string _wfPlaytypusRepo = "";
+    private string _wfPlaytypusRef = "main";
+    private string _wfCloudflareProject = "";
+    private string _wfAndroidPackage = "se.playtypus.app";
+    private string _wfPlaytypusToken = "";
+    private string _wfCloudflareApiToken = "";
+    private string _wfCloudflareAccountId = "";
+    private string _wfAndroidKeystoreBase64 = "";
+    private string _wfAndroidKeyAlias = "";
+    private string _wfAndroidKeyPassword = "";
+    private string _wfAndroidKeystorePassword = "";
+    private bool _savingWorkflow;
+    private GitHubOperator.DeployWorkflowResult? _workflowResult;
+
+    private bool CanSaveWorkflow =>
+        (_wfDeployWeb || _wfDeployAndroid) &&
+        !string.IsNullOrWhiteSpace(_wfPlaytypusRepo) &&
+        !string.IsNullOrWhiteSpace(_wfPlaytypusRef) &&
+        (!_wfDeployWeb || !string.IsNullOrWhiteSpace(_wfCloudflareProject));
+
+    private string _tagPlatform = "web";
+    private string _tagVersion = "";
+    private bool _loadingSuggestedVersion;
+    private bool _creatingTag;
+    private GitHubOperator.DeployTagResult? _tagResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.Repo == null) return;
+        _ = LoadReadinessAsync();
+        await LoadWorkflowStatusAsync();
+    }
+
+    private async Task LoadReadinessAsync()
+    {
+        _readiness = await GitHubOperator.CheckDeployReadinessAsync(State.Repo!);
+        _loadingReadiness = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadWorkflowStatusAsync()
+    {
+        _loadingWorkflowStatus = true;
+        StateHasChanged();
+
+        _workflowExists = await State.Repo!.FileExistsAsync(State.Repo.WorkflowFile);
+        if (_workflowExists)
+        {
+            var yaml = await State.Repo.ReadFileAsync(State.Repo.WorkflowFile);
+            var parsed = yaml != null ? GitHubOperator.TryParseDeployWorkflowConfig(yaml) : null;
+            if (parsed != null) ApplyParsedConfig(parsed);
+        }
+        _showWorkflowForm = !_workflowExists;
+
+        _loadingWorkflowStatus = false;
+        StateHasChanged();
+
+        if (_workflowExists) await RefreshSuggestedVersionAsync();
+    }
+
+    private void ApplyParsedConfig(GitHubOperator.DeployWorkflowConfig parsed)
+    {
+        _wfDeployWeb = parsed.DeployWeb;
+        _wfDeployAndroid = parsed.DeployAndroid;
+        _wfPlaytypusRepo = parsed.PlaytypusRepo;
+        _wfPlaytypusRef = parsed.PlaytypusRef;
+        _wfCloudflareProject = parsed.CloudflareProjectName;
+        if (!string.IsNullOrWhiteSpace(parsed.AndroidPackageName)) _wfAndroidPackage = parsed.AndroidPackageName;
+    }
+
+    private void ShowWorkflowFormForEditing() => _showWorkflowForm = true;
+
+    private async Task SaveWorkflowAsync()
+    {
+        _savingWorkflow = true;
+        _workflowResult = null;
+        StateHasChanged();
+
+        var config = new GitHubOperator.DeployWorkflowConfig(
+            _wfDeployWeb, _wfDeployAndroid,
+            _wfPlaytypusRepo.Trim(),
+            string.IsNullOrWhiteSpace(_wfPlaytypusRef) ? "main" : _wfPlaytypusRef.Trim(),
+            _wfCloudflareProject.Trim(),
+            _wfDeployAndroid ? _wfAndroidPackage.Trim() : null,
+            NullIfBlank(_wfPlaytypusToken),
+            _wfDeployWeb ? NullIfBlank(_wfCloudflareApiToken) : null,
+            _wfDeployWeb ? NullIfBlank(_wfCloudflareAccountId) : null,
+            _wfDeployAndroid ? NullIfBlank(_wfAndroidKeystoreBase64) : null,
+            _wfDeployAndroid ? NullIfBlank(_wfAndroidKeyAlias) : null,
+            _wfDeployAndroid ? NullIfBlank(_wfAndroidKeyPassword) : null,
+            _wfDeployAndroid ? NullIfBlank(_wfAndroidKeystorePassword) : null);
+
+        _workflowResult = await GitHubOperator.EnsureDeployWorkflowAsync(State.Repo!, config);
+        _savingWorkflow = false;
+
+        if (_workflowResult.Success)
+        {
+            _workflowExists = true;
+            _showWorkflowForm = false;
+            // Secrets only ever need to reach GitHub once — clear them from
+            // this component's memory immediately after a successful send
+            // rather than leaving typed-in tokens sitting in page state.
+            _wfPlaytypusToken = _wfCloudflareApiToken = _wfCloudflareAccountId = "";
+            _wfAndroidKeystoreBase64 = _wfAndroidKeyAlias = _wfAndroidKeyPassword = _wfAndroidKeystorePassword = "";
+            await RefreshSuggestedVersionAsync();
+        }
+        StateHasChanged();
+    }
+
+    private static string? NullIfBlank(string s) => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    private async Task OnTagPlatformChanged(ChangeEventArgs e)
+    {
+        _tagPlatform = e.Value?.ToString() ?? "web";
+        await RefreshSuggestedVersionAsync();
+    }
+
+    private async Task RefreshSuggestedVersionAsync()
+    {
+        _loadingSuggestedVersion = true;
+        StateHasChanged();
+        _tagVersion = await GitHubOperator.SuggestNextDeployVersionAsync(State.Repo!, _tagPlatform);
+        _loadingSuggestedVersion = false;
+        StateHasChanged();
+    }
+
+    private async Task CreateTagAsync()
+    {
+        _creatingTag = true;
+        _tagResult = null;
+        StateHasChanged();
+
+        _tagResult = await GitHubOperator.CreateDeployTagAsync(State.Repo!, _tagPlatform, _tagVersion);
+        _creatingTag = false;
+        StateHasChanged();
+
+        if (_tagResult.Success) await RefreshSuggestedVersionAsync();
+    }
+}

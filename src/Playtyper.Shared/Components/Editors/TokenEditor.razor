@@ -1,0 +1,92 @@
+@* Tokens-fliken. Theme-dictionaryn är fritt formad (vilka CSS-variabler ett
+   pack faktiskt har varierar), så UI:t itererar det som finns snarare än
+   att anta fasta fältnamn - men försöker hitta en rimlig "bakgrund"-nyckel
+   att kontrastberäkna mot, som en hjälp snarare än en garanti. *@
+
+<div class="editor-pane">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <h3 style="margin:0">Tokens</h3>
+        <div class="theme-toggle">
+            <button class="@(_mode == "light" ? "theme-toggle__btn--active" : "")" @onclick='() => _mode = "light"'>Ljust</button>
+            <button class="@(_mode == "dark" ? "theme-toggle__btn--active" : "")" @onclick='() => _mode = "dark"'>Mörkt</button>
+        </div>
+    </div>
+    <p style="color:var(--color-text-secondary)">Färger för @Draft.PackId. Kontrastvarningar jämför mot den mest sannolika bakgrundsfärgen.</p>
+
+    @{
+        var theme = _mode == "light" ? Draft.ThemeLight : Draft.ThemeDark;
+        var bgKey = theme.Keys.FirstOrDefault(k => k.Contains("background", StringComparison.OrdinalIgnoreCase) || k.Contains("bg", StringComparison.OrdinalIgnoreCase));
+        var bgValue = bgKey != null ? theme[bgKey] : null;
+    }
+
+    <div class="token-grid">
+        @foreach (var key in theme.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList())
+        {
+            var value = theme[key];
+            var ratio = bgValue != null && key != bgKey ? ContrastChecker.ContrastRatio(value, bgValue) : null;
+
+            <div class="card token-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <input type="color" value="@ToColorInputValue(value)"
+                           @onchange="e => SetToken(theme, key, e.Value?.ToString() ?? value)"
+                           style="width:32px;height:28px;padding:0;flex-shrink:0" />
+                    <span style="font-size:13px;word-break:break-all">@key</span>
+                </div>
+                <input value="@value" @onchange="e => SetToken(theme, key, e.Value?.ToString() ?? value)" />
+                @if (ratio != null)
+                {
+                    var pass = ratio.Value >= 4.5;
+                    <span class="badge @(pass ? "badge-success" : "badge-warning")" style="margin-top:6px">
+                        Kontrast @ratio.Value.ToString("0.0") @(pass ? "· AA ok" : "· under AA (4.5)")
+                    </span>
+                }
+            </div>
+        }
+    </div>
+
+    <button class="ghost" style="margin-top:16px" @onclick="AddToken">+ Lägg till token</button>
+</div>
+
+<style>
+    .theme-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+    .theme-toggle button { border: none; border-radius: 0; padding: 4px 12px; font-size: 12px; }
+    .theme-toggle__btn--active { background: var(--color-accent); color: var(--color-accent-text); }
+    .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 12px; }
+    .token-card { padding: 10px; }
+    .token-swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--color-border); flex-shrink: 0; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string _mode = "light";
+
+    private void SetToken(Dictionary<string, string> theme, string key, string value)
+    {
+        theme[key] = value;
+        OnChanged.InvokeAsync();
+    }
+
+    private void AddToken()
+    {
+        var theme = _mode == "light" ? Draft.ThemeLight : Draft.ThemeDark;
+        var name = "new-token";
+        var i = 1;
+        while (theme.ContainsKey(name)) name = $"new-token-{i++}";
+        theme[name] = "#888888";
+        OnChanged.InvokeAsync();
+    }
+
+    private static string SafeColor(string value) =>
+        ContrastChecker.TryParseHex(value, out _) ? value : "#888888";
+
+    private static string ToColorInputValue(string value)
+    {
+        // <input type="color"> accepterar ENDAST #rrggbb (ingen alpha, inga
+        // färgnamn) - normalisera annars visas bara webbläsarens gråa default.
+        if (ContrastChecker.TryParseHex(value, out var rgb))
+            return $"#{rgb.R:x2}{rgb.G:x2}{rgb.B:x2}";
+        return "#888888";
+    }
+}

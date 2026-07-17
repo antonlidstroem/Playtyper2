@@ -1,0 +1,234 @@
+@* Utseende: Typography, AmbientSound, CategoryLayouts, Ui — de fyra
+   återstående "bara rå JSON"-fälten som handlar om hur appen ser ut och
+   är strukturerad, snarare än vad den innehåller. *@
+
+<div class="editor-pane editor-pane--wide">
+
+    <h3>Typografi</h3>
+    <label class="toggle-row">
+        <input type="checkbox" checked="@(Draft.Config.Typography != null)" @onchange="ToggleTypography" />
+        Använd anpassad typografi (annars ärvs typsnitten från theme.css)
+    </label>
+    @if (Draft.Config.Typography is { } typo)
+    {
+        <div class="field-grid" style="margin-top:8px">
+            <div>
+                <label>Förinställning</label>
+                <select value="@(typo.Preset ?? "")" @onchange="e => { typo.Preset = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value!.ToString(); Notify(); }">
+                    <option value="">– anpassad (fyll i fälten nedan) –</option>
+                    @foreach (var name in _fontPresetNames)
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label>Bas-fontstorlek (px) <span class="field-note">(valfri, standard 16)</span></label>
+                <input type="number" min="12" max="28" value="@typo.BaseFontSize" @onchange="e => { typo.BaseFontSize = int.TryParse(e.Value?.ToString(), out var v) ? v : null; Notify(); }" />
+            </div>
+            @if (typo.Preset is null)
+            {
+                <div>
+                    <label>Rubrik-typsnitt <span class="field-note">(Google Fonts-namn)</span></label>
+                    <input value="@typo.HeadingFont" @onchange="e => { typo.HeadingFont = e.Value?.ToString(); Notify(); }" placeholder="t.ex. Playfair Display" />
+                </div>
+                <div>
+                    <label>Brödtext-typsnitt</label>
+                    <input value="@typo.BodyFont" @onchange="e => { typo.BodyFont = e.Value?.ToString(); Notify(); }" placeholder="t.ex. Source Serif 4" />
+                </div>
+                <div style="grid-column:1/-1">
+                    <label>Google Fonts-URL <span class="field-note">(valfri — byggs annars automatiskt från namnen ovan)</span></label>
+                    <input value="@typo.GoogleFontsUrl" @onchange="e => { typo.GoogleFontsUrl = e.Value?.ToString(); Notify(); }" placeholder="https://fonts.googleapis.com/css2?family=..." />
+                </div>
+            }
+        </div>
+
+        <label class="field-note" style="display:block;margin-top:10px">Lokala typsnittsfiler <span class="field-note">(för offline-bruk i Playtyper.App/MAUI — relativt pack-roten)</span></label>
+        <div class="stack-list stack-list--nested">
+            @foreach (var font in typo.LocalFonts ??= new())
+            {
+                <div class="dict-row">
+                    <input value="@font.File" placeholder="fonts/MinFont-Regular.ttf" @onchange="e => { font.File = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+                    <input type="number" value="@font.Weight" placeholder="400" @onchange="e => { font.Weight = int.TryParse(e.Value?.ToString(), out var v) ? v : font.Weight; Notify(); }" style="width:70px" />
+                    <input value="@font.Style" placeholder="normal" @onchange="e => { font.Style = e.Value?.ToString() ?? "normal"; Notify(); }" style="width:90px" />
+                    <button class="ghost" @onclick="() => { typo.LocalFonts!.Remove(font); Notify(); }">✕</button>
+                </div>
+            }
+            <button class="ghost dict-editor__add" @onclick="() => { (typo.LocalFonts ??= new()).Add(new LocalFontFace()); Notify(); }">+ Typsnittsfil</button>
+        </div>
+    }
+
+    <h3 style="margin-top:28px">Bakgrundsljud</h3>
+    <label class="toggle-row">
+        <input type="checkbox" checked="@(Draft.Config.AmbientSound != null)" @onchange="ToggleAmbientSound" />
+        Visa en ljud-toggle i headern
+    </label>
+    @if (Draft.Config.AmbientSound is { } sound)
+    {
+        <div class="field-grid" style="margin-top:8px">
+            <div>
+                <label>Ljudfil <span class="field-note">(sökväg i packet)</span></label>
+                <input @bind="sound.File" @bind:event="oninput" @bind:after="Notify" placeholder="audio/rain.mp3" />
+            </div>
+            <div>
+                <label>Etikett</label>
+                <input @bind="sound.LabelKey" @bind:event="oninput" @bind:after="Notify" />
+            </div>
+            <div>
+                <label>Volym: @sound.Volume.ToString("0.0")</label>
+                <input type="range" min="0" max="1" step="0.1" value="@sound.Volume" @onchange="e => { sound.Volume = double.TryParse(e.Value?.ToString(), out var v) ? v : sound.Volume; Notify(); }" />
+            </div>
+        </div>
+    }
+
+    <h3 style="margin-top:28px">Kategorilayout <span class="count-badge">@Draft.Config.CategoryLayouts.Count</span></h3>
+    <p class="section-hint">Tvingar en specifik vy för en viss kategori, oavsett vad besökaren annars valt.</p>
+    <div class="stack-list">
+        @foreach (var layout in Draft.Config.CategoryLayouts)
+        {
+            <div class="dict-row">
+                <select value="@layout.CategoryId" @onchange="e => { layout.CategoryId = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1">
+                    <option value="">– välj kategori –</option>
+                    @foreach (var cat in Draft.Config.Categories)
+                    {
+                        <option value="@cat.Id">@cat.Emoji @cat.LabelKey</option>
+                    }
+                </select>
+                <select @bind="layout.LayoutMode" @bind:after="Notify" style="width:120px">
+                    <option value="card">card</option>
+                    <option value="list">list</option>
+                    <option value="mosaic">mosaic</option>
+                    <option value="timeline">timeline</option>
+                    <option value="table">table</option>
+                </select>
+                <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Remove(layout); Notify(); }">✕</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Add(new CategoryLayoutConfig()); Notify(); }">+ Kategorilayout</button>
+
+    <h3 style="margin-top:28px">Struktur (Ui)</h3>
+    <label class="toggle-row">
+        <input type="checkbox" checked="@(Draft.Config.Ui != null)" @onchange="ToggleUi" />
+        Anpassa header/kort/rutnät-stil (annars används standardvärdena)
+    </label>
+    @if (Draft.Config.Ui is { } ui)
+    {
+        <div class="field-grid" style="margin-top:8px">
+            <div>
+                <label>Header-stil</label>
+                <select @bind="ui.HeaderStyle" @bind:after="Notify">
+                    <option value="surface">surface</option>
+                    <option value="transparent">transparent</option>
+                    <option value="solid">solid</option>
+                </select>
+            </div>
+            <div>
+                <label>Kort-stil</label>
+                <input @bind="ui.CardStyle" @bind:event="oninput" @bind:after="Notify" placeholder="default" />
+            </div>
+            <div>
+                <label>Rutnäts-stil</label>
+                <select @bind="ui.GridStyle" @bind:after="Notify">
+                    <option value="single">single</option>
+                    <option value="masonry">masonry</option>
+                </select>
+            </div>
+            <div>
+                <label>Detaljvy-stil</label>
+                <select @bind="ui.DetailStyle" @bind:after="Notify">
+                    <option value="sheet">sheet</option>
+                    <option value="page">page</option>
+                </select>
+            </div>
+            <div>
+                <label>Densitet (listvy)</label>
+                <select @bind="ui.Density" @bind:after="Notify">
+                    <option value="comfortable">comfortable (~64px)</option>
+                    <option value="compact">compact (~44px)</option>
+                    <option value="minimal">minimal (~34px)</option>
+                </select>
+            </div>
+            <div>
+                <label>Tidslinje grupperas per</label>
+                <select @bind="ui.TimelineGrouping" @bind:after="Notify">
+                    <option value="week">vecka</option>
+                    <option value="month">månad</option>
+                    <option value="year">år</option>
+                </select>
+            </div>
+            <div>
+                <label>Startskärm</label>
+                <select @bind="ui.HomeLayout" @bind:after="Notify">
+                    <option value="feed">feed (flöde + ev. Redo nu)</option>
+                    <option value="dashboard">dashboard (snabbåtgärder + kategorikakel)</option>
+                </select>
+            </div>
+        </div>
+        <label class="field-note" style="display:block;margin-top:10px">Vyer i vyväxlaren <span class="field-note">(tom = card + list, standard)</span></label>
+        <div class="layout-checks">
+            @foreach (var mode in new[] { "card", "list", "mosaic" })
+            {
+                <label class="toggle-row">
+                    <input type="checkbox" checked="@((ui.AvailableLayouts ?? new()).Contains(mode))" @onchange="e => ToggleLayoutMode(ui, mode, e.Value is bool b && b)" />
+                    @mode
+                </label>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .editor-pane { padding: 20px 24px 60px; max-width: 720px; }
+    .editor-pane--wide { max-width: 860px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
+    .field-note { color: var(--color-text-muted); font-size: 12px; }
+    .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
+    .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
+    .stack-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .stack-list--nested { margin-top: 6px; }
+    .dict-row { display: flex; align-items: center; gap: 6px; }
+    .dict-editor__add { font-size: 12px; padding: 4px 10px; align-self: flex-start; }
+    .layout-checks { display: flex; gap: 18px; margin-top: 6px; }
+    @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly string[] _fontPresetNames = FontPresets.All.Keys.OrderBy(k => k).ToArray();
+
+    private void ToggleTypography(ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        Draft.Config.Typography = on ? (Draft.Config.Typography ?? new TypographyConfig()) : null;
+        Notify();
+    }
+
+    private void ToggleAmbientSound(ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        Draft.Config.AmbientSound = on ? (Draft.Config.AmbientSound ?? new AmbientSoundConfig()) : null;
+        Notify();
+    }
+
+    private void ToggleUi(ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        Draft.Config.Ui = on ? (Draft.Config.Ui ?? new UiConfig()) : null;
+        Notify();
+    }
+
+    private void ToggleLayoutMode(UiConfig ui, string mode, bool on)
+    {
+        var list = ui.AvailableLayouts is { Count: > 0 } existing ? new List<string>(existing) : new List<string>();
+        if (on && !list.Contains(mode)) list.Add(mode);
+        else if (!on) list.Remove(mode);
+        ui.AvailableLayouts = list.Count > 0 ? list : null;
+        Notify();
+    }
+
+    private void Notify() => OnChanged.InvokeAsync();
+}

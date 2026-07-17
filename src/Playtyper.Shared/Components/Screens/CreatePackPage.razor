@@ -1,0 +1,187 @@
+@page "/pack/new"
+@inject AppState State
+@inject NavigationManager Nav
+
+<div class="apps-page">
+    <div class="apps-page__header">
+        <button class="ghost" @onclick='() => Nav.NavigateTo("apps/browse")'>← Tillbaka</button>
+        <div style="flex:1"><h2>Nytt pack — AI-genererat</h2></div>
+    </div>
+
+    <p style="color:var(--color-text-secondary);max-width:640px">
+        Samma flöde som Packwizard idag: Playtyper genererar en detaljerad prompt utifrån
+        formuläret nedan. Du klistrar in den i Claude.ai eller Claude Code, klistrar tillbaka
+        svaret här, och Playtyper packar upp filerna — i två steg (identitet/tema, sedan
+        aktiviteter/översättningar) eftersom det ger bättre resultat än att be om allt på en gång.
+    </p>
+
+    @if (_step == Step.Brief)
+    {
+        <div class="card" style="max-width:640px">
+            <h3>1. Grundinformation</h3>
+            <label>Kund-ID (kebab-case)</label>
+            <input @bind="_brief.PackId" placeholder="borasstad" />
+            <label style="margin-top:8px">App-namn</label>
+            <input @bind="_brief.AppName" placeholder="Borås Stad" />
+            <label style="margin-top:8px">Tagline</label>
+            <input @bind="_brief.Tagline" placeholder="Din guide till en tryggare vardag" />
+            <label style="margin-top:8px">Beskrivning</label>
+            <textarea @bind="_brief.Description" rows="2" placeholder="Vad är appen till för?"></textarea>
+            <label style="margin-top:8px">Målgrupp</label>
+            <input @bind="_brief.TargetAudience" placeholder="t.ex. äldre invånare, nyanlända, unga vuxna" />
+            <label style="margin-top:8px">Användningskontext</label>
+            <input @bind="_brief.UsageContext" placeholder="t.ex. akut situation, vardagsstöd, egenvård" />
+            <label style="margin-top:8px">Ton</label>
+            <input @bind="_brief.Tone" placeholder="t.ex. lugn och stödjande, professionell, varm" />
+
+            <div style="display:flex;gap:10px;margin-top:8px">
+                <div style="flex:1">
+                    <label>Primärfärg</label>
+                    <input type="color" @bind="_brief.PrimaryColor" />
+                </div>
+                <div style="flex:1">
+                    <label>Accentfärg</label>
+                    <input type="color" @bind="_brief.AccentColor" />
+                </div>
+            </div>
+
+            <label style="margin-top:8px">Kategorier <span style="color:var(--color-text-muted)">(kommaseparerat)</span></label>
+            <input @bind="_categoriesRaw" placeholder="Andning, Rörelse, Vila, Kontakt" />
+
+            <label style="margin-top:8px">Antal aktiviteter (mål)</label>
+            <input type="number" @bind="_brief.TargetActivityCount" />
+
+            <button class="primary" style="margin-top:16px" @onclick="GeneratePhase1">Generera prompt (steg 1)</button>
+        </div>
+    }
+    else if (_step == Step.Phase1Prompt)
+    {
+        <div class="card" style="max-width:720px">
+            <h3>2. Klistra in i Claude</h3>
+            <p style="color:var(--color-text-secondary);font-size:13px">Kopiera hela prompten nedan till Claude.ai eller Claude Code.</p>
+            <textarea readonly rows="14" style="font-size:12px">@_phase1Prompt</textarea>
+            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase1">Kopiera prompt</button>
+
+            <h3 style="margin-top:20px">3. Klistra in svaret</h3>
+            <textarea @bind="_phase1Response" rows="14" placeholder="Klistra in Claudes fullständiga svar här…"></textarea>
+            @if (_error != null)
+            {
+                <p class="apps-page__error">@_error</p>
+            }
+            <button class="primary" style="margin-top:8px" @onclick="ParsePhase1">Tolka svaret och fortsätt</button>
+        </div>
+    }
+    else if (_step == Step.Phase2Prompt)
+    {
+        <div class="card" style="max-width:720px">
+            <p class="badge badge-success">Identitet och tema tolkades (@_phase1Files.Count filer)</p>
+            <h3 style="margin-top:12px">4. Klistra in nästa prompt i Claude</h3>
+            <p style="color:var(--color-text-secondary);font-size:13px">Samma konversation — be Claude fortsätta med aktiviteterna.</p>
+            <textarea readonly rows="14" style="font-size:12px">@_phase2Prompt</textarea>
+            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase2">Kopiera prompt</button>
+
+            <h3 style="margin-top:20px">5. Klistra in svaret</h3>
+            <textarea @bind="_phase2Response" rows="14" placeholder="Klistra in Claudes fullständiga svar här…"></textarea>
+            @if (_error != null)
+            {
+                <p class="apps-page__error">@_error</p>
+            }
+            <button class="primary" style="margin-top:8px" @onclick="ParsePhase2AndSave" disabled="@_saving">
+                @if (_saving) { <span class="spinner"></span> <text>Skriver till GitHub…</text> } else { <text>Tolka svaret och skapa packet</text> }
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private enum Step { Brief, Phase1Prompt, Phase2Prompt }
+    private Step _step = Step.Brief;
+
+    private readonly PackBrief _brief = new();
+    private string _categoriesRaw = "";
+    private string? _error;
+    private bool _saving;
+
+    private string _phase1Prompt = "";
+    private string _phase1Response = "";
+    private Dictionary<string, string> _phase1Files = new();
+
+    private string _phase2Prompt = "";
+    private string _phase2Response = "";
+
+    protected override void OnInitialized()
+    {
+        if (State.Repo == null) Nav.NavigateTo("apps");
+    }
+
+    private void GeneratePhase1()
+    {
+        _brief.Categories = _categoriesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (_brief.Languages.Count == 0)
+            _brief.Languages.Add(new LangDef { Code = "sv", Label = "Svenska" });
+
+        _phase1Prompt = PromptGenerator.Generate(_brief);
+        _step = Step.Phase1Prompt;
+    }
+
+    private async Task CopyPhase1() => await CopyToClipboardAsync(_phase1Prompt);
+    private async Task CopyPhase2() => await CopyToClipboardAsync(_phase2Prompt);
+
+    [Inject] private Microsoft.JSInterop.IJSRuntime Js { get; set; } = default!;
+
+    private async Task CopyToClipboardAsync(string text)
+    {
+        try { await Js.InvokeVoidAsync("navigator.clipboard.writeText", text); }
+        catch { /* clipboard-API kan nekas i vissa kontexter - texten går att markera manuellt ändå */ }
+    }
+
+    private void ParsePhase1()
+    {
+        _error = null;
+        var files = PackFileParser.Parse(_phase1Response, _brief.Languages.Select(l => l.Code));
+
+        if (!files.ContainsKey("pack.config.json"))
+        {
+            _error = "Hittade ingen pack.config.json i svaret — kontrollera att du klistrade in hela Claudes svar.";
+            return;
+        }
+
+        _phase1Files = files;
+        _phase2Prompt = PromptGenerator.GeneratePhase2(_brief, files["pack.config.json"]);
+        _step = Step.Phase2Prompt;
+    }
+
+    private async Task ParsePhase2AndSave()
+    {
+        _error = null;
+        var phase2Files = PackFileParser.Parse(_phase2Response, _brief.Languages.Select(l => l.Code));
+
+        var hasActivities = phase2Files.Keys.Any(k => k.StartsWith("activities."));
+        if (!hasActivities)
+        {
+            _error = "Hittade ingen activities-fil i svaret — kontrollera att du klistrade in hela Claudes svar.";
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        var allFiles = new Dictionary<string, string>(_phase1Files);
+        foreach (var (k, v) in phase2Files) allFiles[k] = v;
+
+        var packDir = State.Repo!.PackDir(_brief.PackId);
+        try
+        {
+            foreach (var (filename, content) in allFiles)
+                await State.Repo.CreateFileAsync($"{packDir}/{filename}", content, $"feat: skapa pack {_brief.PackId} (Playtyper AI)");
+        }
+        catch (RemoteWriteException ex)
+        {
+            _error = $"Misslyckades vid \"{ex.Path}\": {ex.GitHubError}";
+            _saving = false;
+            return;
+        }
+
+        Nav.NavigateTo($"pack/{_brief.PackId}");
+    }
+}

@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Playtyper.Shared</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Live preview (GAPS.md §2 / "P0") renders the pack being edited through the
+    REAL Playtypus.Core components (AppShell etc.) instead of the old
+    PreviewPanel facade — see Components/Preview/PreviewPanel.razor and
+    Services/PreviewAdapter.cs.
+
+    2026-07-13: switched from a sibling-folder ProjectReference to this
+    PackageReference, per GAPS.md's original plan — Playtypus.Core is now
+    published to GitHub Packages by Playtypus's own CI
+    (.github/workflows/publish-nuget.yml in that repo) on every push to
+    main that touches src/Playtypus.Core/**. See this repo's NuGet.config
+    for the feed, and README.md "Konsumera Playtypus.Core" for the
+    one-time PAT setup. PreviewAdapter/PreviewPanel needed zero changes —
+    they only ever depended on Playtypus.Core's public API, never on how
+    it got onto disk.
+
+    Bump the Version below when you want a newer Core build; there is
+    deliberately no floating/latest range here, so a build today always
+    means the same thing tomorrow.
+
+    (PreviewAdapter/PreviewPanel needed zero changes for THIS package
+    switch specifically — see the separate note below about
+    Playtypus.Core.Models for the one file that DID change, for an
+    unrelated reason.)
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
+    <PackageReference Include="Playtypus.Core" Version="1.0.0" />
+  </ItemGroup>
+
+  <!--
+    2026-07-13: Models/PackConfig.cs, Activity.cs, AuthConfig.cs,
+    BackendConfig.cs, SharedModels.cs and Typography.cs (Playtyper's own
+    hand-copied duplicates of Playtypus.Core's model classes) are deleted.
+    Playtyper now uses Playtypus.Core.Models.PackConfig/Activity/etc.
+    directly as its own working types — this Using makes them available
+    project-wide without qualification, exactly like the deleted local
+    copies were. PackBrief.cs stays in Playtyper.Shared/Models/: it has no
+    Core equivalent (it's the wizard-interview shape, not a pack shape).
+
+    This closes the gap PreviewAdapter.cs's class comment warned about
+    ("if PackConfig/Activity ever drift between the two repos again, this
+    is the code that quietly breaks") by making that drift impossible to
+    express in the first place — there is only one PackConfig type now,
+    not two nominally-different-but-hopefully-identical ones. See
+    PreviewAdapter.cs for what else this simplified.
+  -->
+  <ItemGroup>
+    <Using Include="Playtypus.Core.Models" />
+  </ItemGroup>
+
+</Project>

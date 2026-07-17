@@ -1,0 +1,492 @@
+@page "/apps/bundle"
+@inject AppState State
+@inject NavigationManager Nav
+@using System.Text.Json.Nodes
+@using System.Security.Cryptography
+@using System.Text
+@using System.Net.Http.Json
+
+<div class="apps-page">
+    <div class="apps-page__header">
+        <button class="ghost" @onclick='() => Nav.NavigateTo("apps/browse")'>← Packs</button>
+        <div style="flex:1">
+            <h2>Bundle-hantering</h2>
+            <p style="color:var(--color-text-secondary);margin:0">
+                Vilka packs som ingår i den driftsatta appen, plus app-identitet, bundle-lösenord och licens.
+            </p>
+        </div>
+    </div>
+
+    @if (State.Repo == null)
+    {
+        <p>Inget repo öppet. <a href="apps">Gå tillbaka</a>.</p>
+    }
+    else if (_loading)
+    {
+        <p><span class="spinner"></span> Hämtar bundle…</p>
+    }
+    else if (_bundleIds.Count == 0 && !_creatingNew)
+    {
+        <div class="card" style="max-width:480px">
+            <p>Det här repot har ingen <code>@State.Repo.BundlePath("bundle")</code> än.</p>
+            <button class="primary" @onclick="StartCreate">Skapa app-bundle.json</button>
+        </div>
+    }
+    else if (_bundleIds.Count > 1 && _selectedBundleId == null && !_creatingNew)
+    {
+        @* PackLibrary-läge (äldre modell, flera bundles i samma repo) — ovanligt men RemoteRepo stödjer det. *@
+        <p>Repot har flera bundles:</p>
+        <div class="apps-page__grid">
+            @foreach (var id in _bundleIds)
+            {
+                <button class="apps-page__card" @onclick="() => SelectBundleAsync(id)">
+                    <strong>@id</strong>
+                </button>
+            }
+        </div>
+    }
+    else if (_bundle != null)
+    {
+        <div class="bundle-editor">
+            <h3>App-identitet</h3>
+            <div class="field-grid">
+                <div>
+                    <label>App-id <span class="field-note">(ändra bara om du vet varför — kopplar ihop config med driftsättning)</span></label>
+                    <input value="@GetStr("appId")" @onchange="e => SetStr("appId", e.Value?.ToString())" />
+                </div>
+                <div>
+                    <label>App-namn</label>
+                    <input value="@GetStr("appName")" @onchange="e => SetStr("appName", e.Value?.ToString())" />
+                </div>
+                <div>
+                    <label>Standardpack</label>
+                    <select value="@GetStr("defaultPack")" @onchange="e => SetStr("defaultPack", e.Value?.ToString())">
+                        <option value="">– välj –</option>
+                        @foreach (var id in _packIds)
+                        {
+                            <option value="@id">@id</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label>Accentfärg</label>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <input type="color" value="@(GetStr("accentColor") is { Length: > 0 } c ? c : "#E8845A")" @onchange="e => SetStr("accentColor", e.Value?.ToString())" style="width:44px;padding:2px" />
+                        <input value="@GetStr("accentColor")" @onchange="e => SetStr("accentColor", e.Value?.ToString())" placeholder="#E8845A" style="flex:1" />
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top:24px">Butiksbeskrivning</h3>
+            <div class="field-grid">
+                <div>
+                    <label>Svenska</label>
+                    <textarea rows="3" value="@GetNested("storeDescription", "sv")" @onchange="e => SetNested("storeDescription", "sv", e.Value?.ToString())"></textarea>
+                </div>
+                <div>
+                    <label>Engelska</label>
+                    <textarea rows="3" value="@GetNested("storeDescription", "en")" @onchange="e => SetNested("storeDescription", "en", e.Value?.ToString())"></textarea>
+                </div>
+            </div>
+
+            <h3 style="margin-top:24px">Packs i bundlen <span class="count-badge">@BundleRepository.GetPacks(_bundle).Count av @_packIds.Count</span></h3>
+            <p class="section-hint">Packs som INTE är ikryssade finns kvar i repot (redigerbara i Playtyper) men skeppas inte med den här appen.</p>
+            <div class="pack-checklist">
+                @foreach (var id in _packIds)
+                {
+                    <label class="toggle-row">
+                        <input type="checkbox" checked="@BundleRepository.GetPacks(_bundle).Contains(id)" @onchange="e => TogglePack(id, e.Value is bool b && b)" />
+                        @id
+                    </label>
+                }
+            </div>
+            @if (_packIds.Count == 0)
+            {
+                <p class="field-note">Inga packs i repot än — inget att lägga till.</p>
+            }
+
+            <h3 style="margin-top:24px">Bundle-lösenord</h3>
+            <p class="section-hint">Visas före pack-väljaren (eller före det enda packet, i enpacks-bundlar) — separat från ett enskilt packs eget lösenord under Backend &amp; inloggning.</p>
+            <label class="toggle-row">
+                <input type="checkbox" checked="@GetAuthEnabled()" @onchange="ToggleBundleAuth" />
+                Kräv lösenord innan bundlen öppnas
+            </label>
+            @if (GetAuthEnabled())
+            {
+                <div class="field-grid" style="margin-top:8px">
+                    <div>
+                        <label>Nytt lösenord <span class="field-note">(hashas direkt)</span></label>
+                        <input type="password" @bind="_newBundlePassword" @bind:event="oninput" @bind:after="ApplyBundlePassword" />
+                    </div>
+                    <div>
+                        <label>Sessionslängd (timmar)</label>
+                        <input type="number" min="1" value="@GetAuthInt("sessionHours", 24)" @onchange="e => SetAuthInt("sessionHours", e.Value?.ToString())" />
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Ledtråd <span class="field-note">(klartext — visas innan pack:ets eget språk är känt)</span></label>
+                        <input value="@GetAuthStr("hint")" @onchange="e => SetAuthStr("hint", e.Value?.ToString())" />
+                    </div>
+                </div>
+                <p class="field-note" style="margin-top:6px">Nuvarande hash: <code>@(string.IsNullOrEmpty(GetAuthStr("passwordHash")) ? "(inget satt än)" : GetAuthStr("passwordHash"))</code></p>
+            }
+
+            <h3 style="margin-top:24px">Licens</h3>
+            <div class="field-grid">
+                <div>
+                    <label>Licens-id</label>
+                    <input value="@BundleRepository.GetLicenseId(_bundle)" @onchange="e => { if (!string.IsNullOrWhiteSpace(e.Value?.ToString())) BundleRepository.SetLicenseId(_bundle, e.Value!.ToString()!); }" />
+                </div>
+                <div>
+                    <label>Licensserver-URL <span class="field-note">(valfri — annars license.playtypus.se)</span></label>
+                    <input value="@BundleRepository.GetLicenseServerUrl(_bundle)" @onchange="e => BundleRepository.SetLicenseServerUrl(_bundle, e.Value?.ToString())" placeholder="https://..." />
+                </div>
+            </div>
+
+            @{ var licenseId = BundleRepository.GetLicenseId(_bundle); }
+            @if (!string.IsNullOrWhiteSpace(licenseId))
+            {
+                <div style="margin-top:10px">
+                    <button class="ghost" @onclick="CheckLicenseStatusAsync" disabled="@_checkingLicense">
+                        @(_checkingLicense ? "Kontrollerar…" : "🔄 Kontrollera status")
+                    </button>
+                    @if (_licenseStatus != null)
+                    {
+                        <div class="card" style="margin-top:8px;max-width:420px">
+                            <p style="margin:0"><strong>@_licenseStatus.StatusLabel</strong> · @_licenseStatus.CustomerName</p>
+                            <p class="field-note" style="margin:4px 0 0">
+                                @_licenseStatus.ProductId · går ut @_licenseStatus.ExpiresDate.ToString("yyyy-MM-dd")
+                                (@_licenseStatus.DaysRemaining dagar kvar@(_licenseStatus.GracePeriodDays > 0 ? $", + {_licenseStatus.GracePeriodDays} dagars respit" : ""))
+                            </p>
+                        </div>
+                    }
+                    @if (_licenseError != null)
+                    {
+                        <p class="apps-page__error" style="margin-top:8px">
+                            @_licenseError
+                            <span class="field-note">Om servern rimligen borde svara: kontrollera att licensservern tillåter förfrågningar från den här webbläsar-origin (CORS) — det är ett serverdrift-krav, inget Playtyper kan styra över.</span>
+                        </p>
+                    }
+
+                    <details style="margin-top:12px">
+                        <summary style="cursor:pointer;font-size:13px;color:var(--color-text-secondary)">Admin-åtgärder (förnya / återkalla)</summary>
+                        <div class="field-grid" style="margin-top:8px">
+                            <div style="grid-column:1/-1">
+                                <label>Admin-nyckel <span class="field-note">(bara i minnet den här sessionen, sparas aldrig)</span></label>
+                                <input type="password" @bind="_adminKey" @bind:event="oninput" placeholder="X-Admin-Key" />
+                            </div>
+                            <div>
+                                <label>År att lägga till vid förnyelse</label>
+                                <input type="number" min="1" max="10" @bind="_renewYears" />
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                            <button class="ghost" @onclick="RenewLicenseAsync" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Förnya @_renewYears år</button>
+                            <button class="ghost" style="color:var(--color-danger, #c0392b)" @onclick="() => _confirmRevoke = true" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Återkalla licens</button>
+                        </div>
+                        @if (_confirmRevoke)
+                        {
+                            <div class="field-grid" style="margin-top:8px">
+                                <div style="grid-column:1/-1">
+                                    <label>Anledning <span class="field-note">(sparas i licensloggen)</span></label>
+                                    <input @bind="_revokeReason" @bind:event="oninput" />
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:6px">
+                                <button class="ghost" @onclick="() => _confirmRevoke = false">Avbryt</button>
+                                <button class="primary" style="background:var(--color-danger, #c0392b)" @onclick="RevokeLicenseAsync" disabled="@_licenseBusy">Bekräfta återkallning</button>
+                            </div>
+                        }
+                    </details>
+                </div>
+            }
+            <p class="field-note" style="margin-top:8px">
+                Skapa en HELT NY licens görs fortfarande via PackWizards Licenshantering (kräver mer kringinfo — kundnamn, pris, e-post — än vad den här sidan samlar in).
+            </p>
+
+            @if (_error != null)
+            {
+                <p class="apps-page__error" style="margin-top:16px">@_error</p>
+            }
+
+            <div style="display:flex;gap:8px;margin-top:28px">
+                <button class="primary" @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Sparar…" : "Spara bundle")</button>
+                @if (_savedAt.HasValue)
+                {
+                    <span style="color:var(--color-text-muted);font-size:13px;align-self:center">Sparad @_savedAt.Value.ToString("HH:mm:ss")</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .bundle-editor { max-width: 720px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
+    .field-note { color: var(--color-text-muted); font-size: 12px; }
+    .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
+    .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
+    .pack-checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    code { font-size: 11px; word-break: break-all; background: var(--color-surface-2); padding: 2px 5px; border-radius: 4px; }
+    @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private bool _creatingNew;
+    private string? _error;
+    private DateTimeOffset? _savedAt;
+
+    private List<string> _bundleIds = new();
+    private List<string> _packIds = new();
+    private string? _selectedBundleId;
+    private JsonObject? _bundle;
+    private string _newBundlePassword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.Repo == null) { _loading = false; return; }
+
+        _packIds = (await State.Repo.GetPackIdsAsync()).ToList();
+        _bundleIds = (await State.Repo.GetBundleIdsAsync()).ToList();
+
+        if (_bundleIds.Count == 1)
+        {
+            await SelectBundleAsync(_bundleIds[0]);
+        }
+        _loading = false;
+    }
+
+    private async Task SelectBundleAsync(string bundleId)
+    {
+        if (State.Repo == null) return;
+        _selectedBundleId = bundleId;
+        _bundle = await BundleRepository.LoadAsync(State.Repo, State.Repo.BundlePath(bundleId));
+    }
+
+    private void StartCreate()
+    {
+        if (State.Repo == null) return;
+        _creatingNew = true;
+        _selectedBundleId = "bundle";
+        var ownerRepo = State.Repo.OwnerRepo;
+        var suggestedName = ownerRepo.Contains('/') ? ownerRepo[(ownerRepo.IndexOf('/') + 1)..] : ownerRepo;
+        _bundle = BundleRepository.Create(
+            bundleId: "bundle",
+            appId: suggestedName.ToLowerInvariant(),
+            appName: suggestedName,
+            defaultPack: _packIds.FirstOrDefault() ?? "",
+            packs: _packIds.Take(1),
+            accentColor: "#E8845A");
+    }
+
+    // ── Enkla toppnivåfält ───────────────────────────────────────────────
+    private string? GetStr(string key) => _bundle?[key]?.GetValue<string>();
+    private void SetStr(string key, string? value)
+    {
+        if (_bundle == null) return;
+        _bundle[key] = value ?? "";
+    }
+
+    private string? GetNested(string objKey, string innerKey) =>
+        (_bundle?[objKey] as JsonObject)?[innerKey]?.GetValue<string>();
+    private void SetNested(string objKey, string innerKey, string? value)
+    {
+        if (_bundle == null) return;
+        if (_bundle[objKey] is not JsonObject obj) { obj = new JsonObject(); _bundle[objKey] = obj; }
+        obj[innerKey] = value ?? "";
+    }
+
+    private void TogglePack(string packId, bool on)
+    {
+        if (_bundle == null) return;
+        var packs = BundleRepository.GetPacks(_bundle);
+        if (on && !packs.Contains(packId)) packs.Add(packId);
+        else if (!on) packs.Remove(packId);
+        var arr = new JsonArray();
+        foreach (var p in packs) arr.Add(p);
+        _bundle["packs"] = arr;
+    }
+
+    // ── Bundle-auth (löst typad — BundleAuthConfig-formen, se AuthConfig.cs) ──
+    private JsonObject EnsureAuth()
+    {
+        if (_bundle!["auth"] is not JsonObject obj) { obj = new JsonObject(); _bundle["auth"] = obj; }
+        return obj;
+    }
+    private bool GetAuthEnabled() => (_bundle?["auth"] as JsonObject)?["enabled"]?.GetValue<bool>() ?? false;
+    private string? GetAuthStr(string key) => (_bundle?["auth"] as JsonObject)?[key]?.GetValue<string>();
+    private void SetAuthStr(string key, string? value) { if (_bundle != null) EnsureAuth()[key] = value ?? ""; }
+    private int GetAuthInt(string key, int fallback) => (_bundle?["auth"] as JsonObject)?[key]?.GetValue<int>() ?? fallback;
+    private void SetAuthInt(string key, string? raw) { if (_bundle != null && int.TryParse(raw, out var v)) EnsureAuth()[key] = v; }
+
+    private void ToggleBundleAuth(ChangeEventArgs e)
+    {
+        if (_bundle == null) return;
+        var on = e.Value is bool b && b;
+        var auth = EnsureAuth();
+        auth["enabled"] = on;
+        auth["passwordHash"] ??= "";
+        auth["sessionHours"] ??= 24;
+    }
+
+    private void ApplyBundlePassword()
+    {
+        if (_bundle == null || string.IsNullOrEmpty(_newBundlePassword)) return;
+        EnsureAuth()["passwordHash"] = Sha256Hex(_newBundlePassword);
+        _newBundlePassword = "";
+    }
+
+    private static string Sha256Hex(string input)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (State.Repo == null || _bundle == null || _selectedBundleId == null) return;
+        _saving = true;
+        _error = null;
+        try
+        {
+            await BundleRepository.SaveAsync(State.Repo, State.Repo.BundlePath(_selectedBundleId), _bundle,
+                _creatingNew ? $"Skapa {State.Repo.BundlePath(_selectedBundleId)} (via Playtyper)" : $"Uppdatera {State.Repo.BundlePath(_selectedBundleId)} (via Playtyper)");
+            _creatingNew = false;
+            if (!_bundleIds.Contains(_selectedBundleId)) _bundleIds.Add(_selectedBundleId);
+            State.Repo.InvalidateListings();
+            _savedAt = DateTimeOffset.Now;
+        }
+        catch (RemoteWriteException ex)
+        {
+            _error = $"Kunde inte spara: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ── Licens ───────────────────────────────────────────────────────────
+    // Porterad från PackWizards LicenseApiService.cs (samma DTO-form, samma
+    // endpoints, samma "https://license.playtypus.se"-fallback när ingen
+    // serverUrl är satt — se ResolveServerUrl i PackWizards LicenseMode.cs).
+    // Statuskollen kräver ingen admin-nyckel enligt servern (PackWizard-
+    // kommentaren: "publik, ingen admin-nyckel"); förnya/återkalla gör det
+    // (X-Admin-Key), därav de separata fälten nedan som aldrig sparas till
+    // bundle-filen eller nån annanstans — bara i minnet den här sessionen.
+    //
+    // OBS CORS: till skillnad från PackWizard (körs lokalt/i CI, aldrig i en
+    // webbläsare) är det här ett WASM-anrop över nätet. Licensservern måste
+    // tillåta den här originen — ett driftskrav, inget Playtyper kan lösa
+    // från klientsidan.
+    private bool _checkingLicense;
+    private bool _licenseBusy;
+    private string? _licenseError;
+    private LicenseStatusDto? _licenseStatus;
+    private string _adminKey = "";
+    private int _renewYears = 1;
+    private bool _confirmRevoke;
+    private string _revokeReason = "";
+
+    private string ResolveLicenseServerUrl()
+    {
+        var configured = BundleRepository.GetLicenseServerUrl(_bundle);
+        return string.IsNullOrWhiteSpace(configured) ? "https://license.playtypus.se" : configured;
+    }
+
+    private async Task CheckLicenseStatusAsync()
+    {
+        var licenseId = BundleRepository.GetLicenseId(_bundle!);
+        if (string.IsNullOrWhiteSpace(licenseId)) return;
+        _checkingLicense = true;
+        _licenseError = null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var url = $"{ResolveLicenseServerUrl().TrimEnd('/')}/api/license/status?licenseId={Uri.EscapeDataString(licenseId)}";
+            _licenseStatus = await client.GetFromJsonAsync<LicenseStatusDto>(url);
+        }
+        catch (Exception ex)
+        {
+            _licenseError = $"Kunde inte nå licensservern: {ex.Message}";
+            _licenseStatus = null;
+        }
+        finally
+        {
+            _checkingLicense = false;
+        }
+    }
+
+    private async Task RenewLicenseAsync()
+    {
+        var licenseId = BundleRepository.GetLicenseId(_bundle!);
+        if (string.IsNullOrWhiteSpace(licenseId) || string.IsNullOrWhiteSpace(_adminKey)) return;
+        _licenseBusy = true;
+        _licenseError = null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.Add("X-Admin-Key", _adminKey);
+            var url = $"{ResolveLicenseServerUrl().TrimEnd('/')}/api/admin/license/{licenseId}/renew";
+            var response = await client.PostAsJsonAsync(url, new { yearsToAdd = _renewYears, notes = (string?)null });
+            if (!response.IsSuccessStatusCode)
+            {
+                _licenseError = $"Serverfel {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+            _licenseStatus = await response.Content.ReadFromJsonAsync<LicenseStatusDto>();
+        }
+        catch (Exception ex)
+        {
+            _licenseError = $"Kunde inte förnya: {ex.Message}";
+        }
+        finally
+        {
+            _licenseBusy = false;
+        }
+    }
+
+    private async Task RevokeLicenseAsync()
+    {
+        var licenseId = BundleRepository.GetLicenseId(_bundle!);
+        if (string.IsNullOrWhiteSpace(licenseId) || string.IsNullOrWhiteSpace(_adminKey)) return;
+        _licenseBusy = true;
+        _licenseError = null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.Add("X-Admin-Key", _adminKey);
+            var url = $"{ResolveLicenseServerUrl().TrimEnd('/')}/api/admin/license/{licenseId}/revoke";
+            var response = await client.PostAsJsonAsync(url, new { reason = _revokeReason });
+            if (!response.IsSuccessStatusCode)
+            {
+                _licenseError = $"Serverfel {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+            _confirmRevoke = false;
+            await CheckLicenseStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _licenseError = $"Kunde inte återkalla: {ex.Message}";
+        }
+        finally
+        {
+            _licenseBusy = false;
+        }
+    }
+
+    private sealed class LicenseStatusDto
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("licenseId")] public string LicenseId { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("status")] public string Status { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("customerName")] public string CustomerName { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("productId")] public string ProductId { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("expiresDate")] public DateTimeOffset ExpiresDate { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("daysRemaining")] public int DaysRemaining { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("gracePeriodDays")] public int GracePeriodDays { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("statusLabel")] public string StatusLabel { get; set; } = "";
+    }
+}

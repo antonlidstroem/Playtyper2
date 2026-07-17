@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <!-- Samma målplattformar som Playtypus.App - Android + Windows (villkorat
+         till Windows-värdar). Inget iOS/macCatalyst: dels bygger inte
+         huvudappen det heller (inget att avvika ifrån), dels KRÄVER iOS-bygen
+         Xcode/macOS, vilket den här sandlådan inte har oavsett. -->
+    <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Playtyper.App</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <UseMauiHybrid>true</UseMauiHybrid>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <ApplicationTitle>Playtyper</ApplicationTitle>
+    <ApplicationId>com.playtypus.playtyper</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+    <WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PNG istället för SVG (som Playtypus.App använder) - vi har bara den
+         uppladdade rasterloggan att utgå från, ingen riktig vektorversion. -->
+    <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#171613" />
+    <MauiSplashScreen Include="Resources\Splash\splash.png" Color="#171613" BaseSize="256,256" />
+    <MauiAsset Include="wwwroot\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net10.0-android'))">
+    <AndroidResource Include="Platforms\Android\Resources\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Se anmärkningen i Playtyper.Shared.csproj / Playtypus.App.csproj om
+         varför paketversionerna nedan är satta till 10.0.0 som platshållare -
+         samma nätverksbegränsning gällde här. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Playtyper.Shared\Playtyper.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <MauiXaml Update="Platforms\Windows\App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
+  </ItemGroup>
+
+</Project>

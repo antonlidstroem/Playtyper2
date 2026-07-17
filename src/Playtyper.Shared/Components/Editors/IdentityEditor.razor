@@ -1,0 +1,101 @@
+@* Identitet-fliken. Muterar Draft.Config direkt (referenstyp) - OnChanged
+   triggar bara omritning + IndexedDB-persistering i föräldern. *@
+
+<div class="editor-pane">
+    <h3>Identitet</h3>
+    <p style="color:var(--color-text-secondary)">Grundläggande information om @Draft.PackId.</p>
+
+    <div class="field-grid">
+        <div>
+            <label>App-namn</label>
+            <input @bind="Draft.Config.AppName" @bind:event="oninput" @bind:after="Notify" />
+        </div>
+        <div>
+            <label>Emoji</label>
+            <input @bind="Draft.Config.Emoji" @bind:event="oninput" @bind:after="Notify" style="max-width:80px" />
+        </div>
+        <div style="grid-column:1/-1">
+            <label>Tagline</label>
+            <input @bind="Draft.Config.Tagline" @bind:event="oninput" @bind:after="Notify" />
+        </div>
+        <div>
+            <label>Version</label>
+            <input @bind="Draft.Config.Version" @bind:event="oninput" @bind:after="Notify" />
+        </div>
+        <div>
+            <label>Standardspråk</label>
+            <input @bind="Draft.Config.DefaultLanguage" @bind:event="oninput" @bind:after="Notify" style="max-width:100px" />
+        </div>
+    </div>
+
+    <h3 style="margin-top:24px">Panic-knapp</h3>
+    <div class="field-grid">
+        <div>
+            <label>Etikett</label>
+            <input @bind="Draft.Config.PanicButton.LabelKey" @bind:event="oninput" @bind:after="Notify" />
+        </div>
+        <div>
+            <label>Stil</label>
+            <select @bind="Draft.Config.PanicButton.Style" @bind:after="Notify">
+                <option value="calm">calm</option>
+                <option value="urgent">urgent</option>
+            </select>
+        </div>
+    </div>
+
+    <h3 style="margin-top:24px">Språk</h3>
+    <p style="color:var(--color-text-secondary);font-size:13px">
+        Utöver Standardspråk ovan — vilka språk som visas i språkväljaren. LanguageService
+        upptäcker även översättningsfiler som saknas här (v2-packs), så listan behöver inte
+        vara uttömmande, men en synlig flagga/etikett kräver en rad.
+    </p>
+    <div class="chip-list">
+        @foreach (var lang in Draft.Config.Languages)
+        {
+            <div class="card chip-edit">
+                <input value="@lang.Flag" @onchange="e => { lang.Flag = e.Value?.ToString() ?? lang.Flag; Notify(); }" placeholder="🇸🇪" style="width:44px;text-align:center" />
+                <input value="@lang.Code" @onchange="e => { lang.Code = e.Value?.ToString() ?? lang.Code; Notify(); }" placeholder="sv" style="width:70px" />
+                <input value="@lang.Label" @onchange="e => { lang.Label = e.Value?.ToString() ?? lang.Label; Notify(); }" placeholder="Svenska" style="flex:1" />
+                <button class="ghost" @onclick="() => { Draft.Config.Languages.Remove(lang); Notify(); }">✕</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="AddLanguage">+ Språk</button>
+
+    <h3 style="margin-top:24px">Startvy &amp; egen CSS</h3>
+    <div class="field-grid">
+        <div>
+            <label>Startvy</label>
+            <select @bind="Draft.Config.StartView" @bind:after="Notify">
+                <option value="grid">grid</option>
+                <option value="panic">panic</option>
+                <option value="welcome">welcome</option>
+            </select>
+        </div>
+        <div style="grid-column:1/-1">
+            <label>Egen CSS <span style="color:var(--color-text-muted)">(valfritt, läggs till sist — kan skriva över tokens)</span></label>
+            <textarea rows="5" style="font-family:monospace;font-size:12px" value="@Draft.Config.CustomCss" @onchange="e => { Draft.Config.CustomCss = e.Value?.ToString(); Notify(); }"></textarea>
+        </div>
+    </div>
+</div>
+
+<style>
+    .editor-pane { padding: 20px 24px 60px; max-width: 720px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    .chip-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .chip-edit { display: flex; gap: 8px; align-items: center; padding: 8px; }
+    @@media (max-width: 520px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void AddLanguage()
+    {
+        Draft.Config.Languages.Add(new LanguageOption { Code = "sv", Label = "Svenska", Flag = "🇸🇪" });
+        _ = Notify();
+    }
+
+    private async Task Notify() => await OnChanged.InvokeAsync();
+}

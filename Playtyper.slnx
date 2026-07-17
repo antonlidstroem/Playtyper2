@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/Playtyper.App/Playtyper.App.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="src/Playtyper.Shared/Playtyper.Shared.csproj" />
+  <Project Path="src/Playtyper.Web/Playtyper.Web.csproj" />
+</Solution>

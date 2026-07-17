@@ -1,0 +1,103 @@
+name: Deploy Playtyper.Web till GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/Playtyper.Web/**"
+      - "src/Playtyper.Shared/**"
+      - "global.json"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch: # gör att du kan trigga en deploy manuellt från Actions-fliken
+
+# Behövs för att workflowen ska få lov att publicera till GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Tillåt bara en deploy i taget, men avbryt inte en pågående publicering
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Playtyper
+        uses: actions/checkout@v4
+
+      # 2026-07-13: Playtypus.Core kommer numera in via ett vanligt
+      # PackageReference (se Playtyper.Shared.csproj), publicerat till
+      # GitHub Packages av Playtypus-repots egen
+      # .github/workflows/publish-nuget.yml. Ingen syskon-checkout behövs
+      # längre — bara autentisering mot paketflödet, styrt av NuGet.config
+      # i repo-roten (källan "playtypus-github" där, %PLAYTYPUS_NUGET_PAT%
+      # löses via miljövariabeln nedan).
+      #
+      # ACTION REQUIRED: lägg en PLAYTYPUS_TOKEN-secret i det här repot
+      # (Settings → Secrets and variables → Actions) — en GitHub PAT med
+      # read:packages på Playtypus-repot — och byt ut DITT_ORG i
+      # NuGet.config mot er riktiga GitHub-org.
+      #
+      # Den här jobbet börjar plötsligt faila på restore/publish utan att
+      # nån rört koden? PLAYTYPUS_TOKEN har troligen gått ut (PAT:en har
+      # ett utgångsdatum ni själva valde) — se README:ts "Token gick ut?"
+      # för förnyelsestegen, inget att felsöka i den här filen.
+      - name: Sätt upp .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Försiktighetsåtgärd — normalt hämtas WASM-runtimen automatiskt via
+      # NuGet vid publish, men workloaden säkerställer att det fungerar även
+      # om SDK-versionen på runnern skulle bete sig annorlunda.
+      - name: Installera wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publicera Playtyper.Web (Release)
+        env:
+          PLAYTYPUS_NUGET_PAT: ${{ secrets.PLAYTYPUS_TOKEN }}
+        run: dotnet publish src/Playtyper.Web/Playtyper.Web.csproj -c Release -o publish-output
+
+      - name: Anpassa för GitHub Pages
+        run: |
+          set -e
+          WWWROOT="publish-output/wwwroot"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
+          # 1) <base href="/"> måste peka på undermappen appen faktiskt
+          #    ligger på: https://<user>.github.io/<REPO_NAME>/
+          sed -i "s|<base href=\"/\" />|<base href=\"/${REPO_NAME}/\" />|" "$WWWROOT/index.html"
+
+          # 2) GitHub Pages har ingen server-side routing. Direktlänkar/
+          #    refresh på t.ex. /pack/abc123 skulle annars ge GitHub Pages
+          #    egen 404-sida. En kopia av index.html som 404.html gör att
+          #    Blazors router själv tar över och navigerar rätt, eftersom
+          #    webbläsarens URL bevaras även när GitHub serverar 404.html.
+          cp "$WWWROOT/index.html" "$WWWROOT/404.html"
+
+          # 3) GitHub Pages körs via Jekyll som ignorerar mappar som börjar
+          #    med understreck (_framework, _content) om inte den här filen
+          #    finns — utan den 404:ar hela appen på sina egna DLL/WASM-filer.
+          touch "$WWWROOT/.nojekyll"
+
+      - name: Konfigurera Pages
+        uses: actions/configure-pages@v5
+
+      - name: Ladda upp artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish-output/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy till GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

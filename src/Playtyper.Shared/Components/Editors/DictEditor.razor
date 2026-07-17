@@ -1,0 +1,50 @@
+@* Liten återanvändbar nyckel/värde-lista - för fritt formade Dictionary<string,string>-fält
+   (FilterBundle, Criteria m.fl.) som annars skulle upprepas identiskt i flera editorer. *@
+
+<div class="dict-editor">
+    @foreach (var key in Dict.Keys.ToList())
+    {
+        <div class="dict-row">
+            <input value="@key" placeholder="nyckel" @onchange="e => RenameKey(key, e.Value?.ToString())" style="width:38%" />
+            <span class="dict-row__eq">=</span>
+            <input value="@Dict[key]" placeholder="värde" @onchange="e => { Dict[key] = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+            <button class="ghost" @onclick="() => { Dict.Remove(key); Notify(); }">✕</button>
+        </div>
+    }
+    <button class="ghost dict-editor__add" @onclick="AddRow">+ @AddLabel</button>
+</div>
+
+<style>
+    .dict-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .dict-row { display: flex; align-items: center; gap: 6px; }
+    .dict-row__eq { color: var(--color-text-muted); font-size: 12px; }
+    .dict-editor__add { align-self: flex-start; font-size: 12px; padding: 4px 10px; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public Dictionary<string, string> Dict { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public string AddLabel { get; set; } = "Rad";
+
+    private void RenameKey(string oldKey, string? newKeyRaw)
+    {
+        var newKey = newKeyRaw ?? oldKey;
+        if (newKey == oldKey || string.IsNullOrWhiteSpace(newKey)) return;
+        if (Dict.ContainsKey(newKey)) return; // undvik att tysta skriva över en annan rad
+        var value = Dict[oldKey];
+        Dict.Remove(oldKey);
+        Dict[newKey] = value;
+        Notify();
+    }
+
+    private void AddRow()
+    {
+        var key = "nyckel";
+        var i = 1;
+        while (Dict.ContainsKey(key)) key = $"nyckel-{i++}";
+        Dict[key] = "";
+        Notify();
+    }
+
+    private void Notify() => OnChanged.InvokeAsync();
+}

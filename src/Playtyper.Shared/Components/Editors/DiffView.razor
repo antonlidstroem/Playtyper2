@@ -1,0 +1,64 @@
+@* Fil-nivå-diff, se motiveringen i PackDraft.cs. *@
+
+<h3>Ändringar</h3>
+
+@{
+    var changes = Draft.Diff(Repo);
+}
+
+@if (changes.Count == 0)
+{
+    <p style="color:var(--color-text-secondary)">Inga osparade ändringar.</p>
+}
+else
+{
+    <p style="color:var(--color-text-secondary);font-size:13px">@changes.Count fil(er) kommer skrivas till GitHub vid nästa "Spara".</p>
+
+    @foreach (var change in changes)
+    {
+        <div class="card diff-file">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge @(change.Kind == FileChangeKind.Added ? "badge-success" : "badge-warning")">
+                    @(change.Kind == FileChangeKind.Added ? "Ny" : "Ändrad")
+                </span>
+                <strong style="font-size:13px">@change.Path</strong>
+            </div>
+
+            @if (change.Kind == FileChangeKind.Modified)
+            {
+                <details>
+                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa före/efter</summary>
+                    <div class="diff-columns">
+                        <div>
+                            <p style="font-size:11px;color:var(--color-text-muted)">Före</p>
+                            <pre>@change.OldContent</pre>
+                        </div>
+                        <div>
+                            <p style="font-size:11px;color:var(--color-text-muted)">Efter</p>
+                            <pre>@change.NewContent</pre>
+                        </div>
+                    </div>
+                </details>
+            }
+            else
+            {
+                <details>
+                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa innehåll</summary>
+                    <pre>@change.NewContent</pre>
+                </details>
+            }
+        </div>
+    }
+}
+
+<style>
+    .diff-file { margin-bottom: 10px; padding: 10px; }
+    .diff-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    @@media (max-width: 560px) { .diff-columns { grid-template-columns: 1fr; } }
+    pre { font-family: var(--font-mono); font-size: 11px; background: var(--color-surface-2); padding: 8px; border-radius: var(--radius-sm); max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter, EditorRequired] public RemoteRepo Repo { get; set; } = default!;
+}

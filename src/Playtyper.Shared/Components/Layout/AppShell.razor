@@ -1,0 +1,171 @@
+@* Samma markup på alla skärmstorlekar - CSS (app.css, @@media 900px/1400px)
+   avgör vad som syns. Ingen JS-baserad brytpunktsdetektion: enklare,
+   robustare, och undviker en "flash of wrong layout" innan JS hunnit köra. *@
+
+<div class="app-shell">
+    <div class="pack-topbar">
+        <div class="pack-topbar__crumbs">
+            <span class="pack-topbar__brand">Playtyper</span>
+            <span class="pack-topbar__sep">/</span>
+            <span>@RepoName</span>
+            <span class="pack-topbar__sep">/</span>
+            <span>@Title</span>
+        </div>
+        <div class="pack-topbar__actions">
+            @if (IsDirty)
+            {
+                <span class="badge badge-warning">Osparat</span>
+            }
+            <button class="ghost pack-topbar__action-label" @onclick="OnShowDiff">Visa ändringar</button>
+            <button class="primary pack-topbar__action-label" @onclick="OnSave" disabled="@(!IsDirty || Saving)">
+                @if (Saving) { <span class="spinner"></span> } else { <text>Spara till GitHub</text> }
+            </button>
+        </div>
+    </div>
+
+    <div class="app-shell__body">
+        <nav class="app-shell__nav-sidebar">
+            @foreach (var tab in Tabs)
+            {
+                <button class="nav-item @(tab.Id == ActiveTab ? "nav-item--active" : "")"
+                        @onclick="() => OnTabChanged.InvokeAsync(tab.Id)" title="@tab.Label">
+                    <span class="nav-icon">@tab.Icon</span>
+                    <span class="nav-label">@tab.Label</span>
+                </button>
+            }
+            @if (PreviewContent != null)
+            {
+                <button class="nav-item nav-item--preview-trigger" @onclick="() => _mobilePreviewOpen = true" title="Förhandsvisning">
+                    <span class="nav-icon">👁️</span>
+                    <span class="nav-label">Förhandsvisning</span>
+                </button>
+            }
+        </nav>
+
+        <main class="app-shell__content">
+            @ChildContent
+        </main>
+
+        @if (PreviewContent != null)
+        {
+            <aside class="app-shell__preview-panel @(_mobilePreviewOpen ? "app-shell__preview-panel--mobile-open" : "")">
+                <button class="preview-panel__close" @onclick="() => _mobilePreviewOpen = false" title="Stäng förhandsvisning" aria-label="Stäng förhandsvisning">✕</button>
+                @PreviewContent
+            </aside>
+        }
+    </div>
+
+    <nav class="app-shell__bottom-nav">
+        @foreach (var tab in Tabs)
+        {
+            <button class="bottom-nav-item @(tab.Id == ActiveTab ? "bottom-nav-item--active" : "")"
+                    @onclick="() => OnTabChanged.InvokeAsync(tab.Id)">
+                <span class="nav-icon">@tab.Icon</span>
+                <span>@tab.Label</span>
+            </button>
+        }
+        @if (PreviewContent != null)
+        {
+            <button class="bottom-nav-item" @onclick="() => _mobilePreviewOpen = true">
+                <span class="nav-icon">👁️</span>
+                <span>Förhandsvisning</span>
+            </button>
+        }
+    </nav>
+</div>
+
+<style>
+    .pack-topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 16px; border-bottom: 1px solid var(--color-border);
+        background: var(--color-surface-1); flex-shrink: 0; gap: 8px; flex-wrap: wrap;
+    }
+    .pack-topbar__crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); min-width: 0; }
+    .pack-topbar__brand { font-weight: 600; color: var(--color-text-primary); }
+    .pack-topbar__sep { opacity: .5; }
+    .pack-topbar__actions { display: flex; align-items: center; gap: 8px; }
+    .pack-topbar__action-label { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
+
+    .app-shell__nav-sidebar { flex-direction: column; padding: 10px 6px; border-right: 1px solid var(--color-border); background: var(--color-surface-1); gap: 2px; overflow-y: auto; }
+    .nav-item {
+        display: flex; align-items: center; gap: 10px; text-align: left;
+        border: none; background: transparent; border-radius: var(--radius-sm);
+        padding: 9px 10px; color: var(--color-text-secondary); font-size: 13px;
+    }
+    .nav-item:hover { background: var(--color-surface-2); }
+    .nav-item--active { background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+    .app-shell__preview-panel { border-left: 1px solid var(--color-border); background: var(--color-surface-1); overflow-y: auto; position: relative; }
+
+    /* Reachable below the 1400px breakpoint (see app.css for the base
+       display:none / @media rules) via the "Förhandsvisning" trigger in
+       the sidebar/bottom-nav above. Two classes combined so this wins over
+       the base display:none rule regardless of source order. */
+    .app-shell__preview-panel.app-shell__preview-panel--mobile-open {
+        display: flex; position: fixed; inset: 0; z-index: 60; width: auto; border-left: none;
+    }
+
+    .preview-panel__close {
+        display: none; position: absolute; top: 8px; right: 8px; z-index: 1;
+        width: 32px; height: 32px; border-radius: 50%; border: none;
+        background: var(--color-surface-2); color: var(--color-text-primary);
+        font-size: 15px; line-height: 1; cursor: pointer;
+    }
+    .app-shell__preview-panel--mobile-open .preview-panel__close { display: flex; align-items: center; justify-content: center; }
+
+    .nav-item--preview-trigger { border-top: 1px solid var(--color-border); margin-top: 4px; padding-top: 11px; }
+
+    @media (min-width: 1400px) {
+        /* The real preview panel is already visible in its normal spot up
+           here. The bottom-nav trigger is already hidden by bottom-nav's
+           own display:none above 900px, but the SIDEBAR trigger isn't —
+           nothing else hides it at this width, so without the rule below
+           it would sit there redundantly next to the panel it opens a
+           duplicate of. Also neutralises the overlay positioning so a
+           stray _mobilePreviewOpen=true surviving a resize doesn't
+           fix-position the always-visible panel. */
+        .nav-item--preview-trigger { display: none; }
+        .app-shell__preview-panel.app-shell__preview-panel--mobile-open { position: static; inset: auto; z-index: auto; width: 340px; }
+    }
+
+    .app-shell__bottom-nav {
+        border-top: 1px solid var(--color-border); background: var(--color-surface-1);
+        flex-shrink: 0; height: var(--bottom-nav-height);
+        /* 2026-07-13: was justify-content:space-around + item flex:1, which
+           divided the bar into N equal slots — fine for the original 5
+           tabs, but with the four new editor tabs (§4/GAPS.md-15) plus the
+           preview trigger that's 10 items, too cramped to divide evenly on
+           a real phone width. Scrolls horizontally instead of squeezing;
+           the active tab is still one tap/swipe away, never off-screen
+           with no way back, since browsers keep a focused/active element
+           roughly in view. */
+        overflow-x: auto; justify-content: flex-start;
+        scrollbar-width: none; /* Firefox */
+    }
+    .app-shell__bottom-nav::-webkit-scrollbar { display: none; }
+    .bottom-nav-item {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+        border: none; background: transparent; flex: 0 0 auto; min-width: 64px;
+        color: var(--color-text-secondary); font-size: 10px; border-radius: 0; padding: 0 4px;
+    }
+    .bottom-nav-item--active { color: var(--color-accent); }
+</style>
+
+@code {
+    public sealed record TabInfo(string Id, string Label, string Icon);
+
+    private bool _mobilePreviewOpen;
+
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string RepoName { get; set; } = "";
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnShowDiff { get; set; }
+    [Parameter] public List<TabInfo> Tabs { get; set; } = new();
+    [Parameter] public string ActiveTab { get; set; } = "";
+    [Parameter] public EventCallback<string> OnTabChanged { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? PreviewContent { get; set; }
+}

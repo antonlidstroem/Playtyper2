@@ -1,0 +1,176 @@
+@using System.Security.Cryptography
+@using System.Text
+@* Backend & inloggning: Backends, Auth. Lösenordsfälten hashas till SHA-256
+   direkt här (samma algoritm som tools/generate-hash/generate-hash.html i
+   huvudrepot: rått UTF8, ingen salt) — inget behov av att hoppa mellan två
+   verktyg för att sätta ett pack-lösenord. *@
+
+<div class="editor-pane editor-pane--wide">
+
+    <h3>Backends <span class="count-badge">@Draft.Config.Backends.Count</span></h3>
+    <p class="section-hint">Namngivna serveranslutningar som aktiviteter kan referera till via backendRef.</p>
+    <div class="stack-list">
+        @foreach (var backend in Draft.Config.Backends)
+        {
+            <div class="card stack-item">
+                <div class="field-grid">
+                    <div>
+                        <label>Id</label>
+                        <input @bind="backend.Id" @bind:event="oninput" @bind:after="Notify" />
+                    </div>
+                    <div>
+                        <label>Auth-läge</label>
+                        <select @bind="backend.AuthMode" @bind:after="Notify">
+                            <option value="none">none (öppet API)</option>
+                            <option value="jwt">jwt (användarens inloggning)</option>
+                            <option value="apikey">apikey (statisk nyckel)</option>
+                        </select>
+                    </div>
+                    <div style="grid-column:1/-1">
+                        <label>Bas-URL</label>
+                        <input @bind="backend.BaseUrl" @bind:event="oninput" @bind:after="Notify" placeholder="https://exempel.se/api" />
+                    </div>
+                    <div>
+                        <label>SignalR-hub <span class="field-note">(valfri — realtid)</span></label>
+                        <input value="@backend.SignalRHub" @onchange="e => { backend.SignalRHub = e.Value?.ToString(); Notify(); }" placeholder="/hubs/lista" />
+                    </div>
+                    <div>
+                        <label>Cache (minuter offline)</label>
+                        <input type="number" min="0" @bind="backend.CacheTtlMinutes" @bind:after="Notify" />
+                    </div>
+                    @if (backend.AuthMode == "apikey")
+                    {
+                        <div style="grid-column:1/-1">
+                            <label>API-nyckel</label>
+                            <input value="@backend.ApiKey" @onchange="e => { backend.ApiKey = e.Value?.ToString(); Notify(); }" />
+                        </div>
+                    }
+                    else if (backend.AuthMode == "jwt")
+                    {
+                        <div style="grid-column:1/-1">
+                            <label>JWT-audience <span class="field-note">(valfri valideringshint)</span></label>
+                            <input value="@backend.JwtAudience" @onchange="e => { backend.JwtAudience = e.Value?.ToString(); Notify(); }" />
+                        </div>
+                    }
+                </div>
+                <button class="ghost stack-item__remove" @onclick="() => { Draft.Config.Backends.Remove(backend); Notify(); }">Ta bort</button>
+            </div>
+        }
+    </div>
+    <button class="ghost" @onclick="() => { Draft.Config.Backends.Add(new BackendConfig { Id = $"backend-{Draft.Config.Backends.Count + 1}" }); Notify(); }">+ Backend</button>
+
+    <h3 style="margin-top:28px">Lösenordsskydd</h3>
+    <label class="toggle-row">
+        <input type="checkbox" checked="@(Draft.Config.Auth?.Enabled ?? false)" @onchange="ToggleAuth" />
+        Kräv lösenord för att öppna paketet
+    </label>
+    @if (Draft.Config.Auth is { } auth)
+    {
+        <div class="field-grid" style="margin-top:8px">
+            <div>
+                <label>Nytt lösenord <span class="field-note">(hashas direkt, sparas aldrig i klartext)</span></label>
+                <input type="password" @bind="_newPassword" @bind:event="oninput" @bind:after="() => ApplyPassword(auth)" placeholder="lämna tomt för att behålla nuvarande" />
+            </div>
+            <div>
+                <label>Sessionslängd (timmar)</label>
+                <input type="number" min="1" @bind="auth.SessionHours" @bind:after="Notify" />
+            </div>
+            <div style="grid-column:1/-1">
+                <label>Ledtråd <span class="field-note">(översättningsnyckel, valfri)</span></label>
+                <input value="@auth.HintKey" @onchange="e => { auth.HintKey = e.Value?.ToString(); Notify(); }" />
+            </div>
+        </div>
+        <p class="field-note" style="margin-top:6px">
+            Nuvarande hash: <code>@(string.IsNullOrEmpty(auth.PasswordHash) ? "(inget lösenord satt än)" : auth.PasswordHash)</code>
+        </p>
+
+        <h4 style="margin-top:18px;margin-bottom:4px">Admin-inloggning <span class="field-note">(valfritt, separat från vanligt lösenord ovan)</span></h4>
+        <div class="field-grid">
+            <div>
+                <label>Nytt admin-lösenord</label>
+                <input type="password" @bind="_newAdminPassword" @bind:event="oninput" @bind:after="() => ApplyAdminPassword(auth)" placeholder="lämna tomt = ingen adminåtkomst" />
+            </div>
+            <div>
+                <label>Admin-sessionslängd (timmar)</label>
+                <input type="number" min="1" @bind="auth.AdminSessionHours" @bind:after="Notify" />
+            </div>
+        </div>
+        <p class="field-note" style="margin-top:6px">
+            Admin-hash: <code>@(string.IsNullOrEmpty(auth.AdminPasswordHash) ? "(ingen adminåtkomst konfigurerad)" : auth.AdminPasswordHash)</code>
+        </p>
+    }
+</div>
+
+<style>
+    .editor-pane { padding: 20px 24px 60px; max-width: 720px; }
+    .editor-pane--wide { max-width: 860px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+    .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
+    .field-note { color: var(--color-text-muted); font-size: 12px; }
+    .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
+    .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
+    .stack-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .stack-item { padding: 12px; }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    code { font-size: 11px; word-break: break-all; background: var(--color-surface-2); padding: 2px 5px; border-radius: 4px; }
+    @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string _newPassword = "";
+    private string _newAdminPassword = "";
+
+    private void ToggleAuth(ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        if (on)
+        {
+            Draft.Config.Auth ??= new AuthConfig();
+            Draft.Config.Auth.Enabled = true;
+        }
+        else if (Draft.Config.Auth != null)
+        {
+            // Behåll hash/inställningar om man bockar ur och sen i igen av
+            // misstag, istället för att tvinga fram ett nytt lösenord varje
+            // gång — bara Enabled växlas.
+            Draft.Config.Auth.Enabled = false;
+        }
+        Notify();
+    }
+
+    private void ApplyPassword(AuthConfig auth)
+    {
+        if (!string.IsNullOrEmpty(_newPassword))
+        {
+            auth.PasswordHash = Sha256Hex(_newPassword);
+            _newPassword = "";
+        }
+        Notify();
+    }
+
+    private void ApplyAdminPassword(AuthConfig auth)
+    {
+        if (!string.IsNullOrEmpty(_newAdminPassword))
+        {
+            auth.AdminPasswordHash = Sha256Hex(_newAdminPassword);
+            _newAdminPassword = "";
+        }
+        Notify();
+    }
+
+    // Samma algoritm som tools/generate-hash/generate-hash.html: rått UTF8,
+    // SHA-256, gemener hex. Måste hållas i synk med den filen manuellt —
+    // det finns ingen delad kod mellan ett fristående HTML-verktyg och en
+    // Blazor-komponent.
+    private static string Sha256Hex(string input)
+    {
+        var bytes = Encoding.UTF8.GetBytes(input);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private void Notify() => OnChanged.InvokeAsync();
+}

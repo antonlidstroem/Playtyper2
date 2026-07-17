@@ -1,0 +1,22 @@
+@* Delad root-komponent för både Playtyper.Web och Playtyper.App. Varje
+   värd har sin egen minimala startpunkt (Web: App.razor, MAUI: MainPage.razor)
+   som bara renderar <PlaytyperApp /> — själva routingen och skalet bor här
+   så den aldrig kan glida isär mellan de två huvudena. *@
+
+<Router AppAssembly="typeof(PlaytyperApp).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(EmptyLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(EmptyLayout)">
+            <div class="card" style="margin:40px auto;max-width:420px;text-align:center;">
+                <h2>Hittar inte sidan</h2>
+                <p style="color:var(--color-text-secondary)">Länken pekar någonstans Playtyper inte känner igen.</p>
+                <a href="">Till startsidan</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+}

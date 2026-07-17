@@ -1,0 +1,221 @@
+/* Playtyper — grunddesign.
+   Brytpunkter (900px, 1400px) är medvetet samma som redan används i
+   Playtypus.Core/wwwroot/css/*.css — bygger man samma produktfamilj ska
+   de dela skala, inte uppfinna en egen. Mobile-first (min-width), inte
+   max-width — samma konvention som resten av kodbasen.
+*/
+
+:root {
+  --color-bg:            #faf9f7;
+  --color-surface-1:     #ffffff;
+  --color-surface-2:     #f2f0ec;
+  --color-border:        #ddd8d0;
+  --color-border-strong: #b8b2a6;
+
+  --color-text-primary:   #201e1a;
+  --color-text-secondary: #5c574d;
+  --color-text-muted:     #8a8478;
+
+  --color-accent:      #2f6f4f;
+  --color-accent-text: #ffffff;
+  --color-accent-soft: #e4efe8;
+
+  --color-success-bg:   #e4f3e6;
+  --color-success-text: #256b35;
+  --color-warning-bg:   #fbf0dd;
+  --color-warning-text: #8a5a12;
+  --color-danger-bg:    #fbe6e4;
+  --color-danger-text:  #a3352a;
+
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 16px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --nav-width: 220px;
+  --bottom-nav-height: 60px;
+}
+
+[data-theme="dark"] {
+  --color-bg:            #171613;
+  --color-surface-1:     #201e1a;
+  --color-surface-2:     #2a2822;
+  --color-border:        #3a372e;
+  --color-border-strong: #524e40;
+
+  --color-text-primary:   #f3f1ec;
+  --color-text-secondary: #b8b2a6;
+  --color-text-muted:     #857f72;
+
+  --color-accent:      #5aa97f;
+  --color-accent-text: #0d1b13;
+  --color-accent-soft: #1e2e24;
+
+  --color-success-bg:   #1c3320;
+  --color-success-text: #7cd393;
+  --color-warning-bg:   #3a2c12;
+  --color-warning-text: #e3b262;
+  --color-danger-bg:    #3a1e1a;
+  --color-danger-text:  #f0968a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#app { height: 100vh; overflow: hidden; }
+
+/* .app-root wrappar EmptyLayout — dvs. alla "enkla" sidor (ConnectRepoPage,
+   MyAppsPage, PackListPage, CreatePackPage, NotFound) som INTE har en egen
+   inre skrollyta som .app-shell__content har för pack-editorn. Utan
+   overflow-y: auto här klipptes allt innehåll som var högre än skärmen bort
+   helt, utan möjlighet att skrolla — t.ex. hela "Nytt pack"-formuläret.
+   Påverkar inte AppShell-sidor: .app-shell fyller exakt 100% av höjden och
+   hanterar sin egen overflow internt oavsett förälderns overflow-läge. */
+.app-root { height: 100vh; overflow-y: auto; }
+
+h1, h2, h3, h4 { margin: 0 0 4px; font-weight: 600; }
+p { margin: 0 0 8px; }
+
+a { color: var(--color-accent); }
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+
+button {
+  cursor: pointer;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  transition: background-color 120ms ease;
+}
+button:hover { background: var(--color-surface-2); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: transparent;
+  font-weight: 600;
+}
+button.primary:hover { filter: brightness(1.08); }
+button.danger { color: var(--color-danger-text); border-color: var(--color-danger-text); }
+button.ghost { background: transparent; border-color: transparent; }
+button.ghost:hover { background: var(--color-surface-2); }
+
+input[type="text"], input[type="color"], input[type="number"], input:not([type]), select, textarea {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  width: 100%;
+}
+textarea { font-family: var(--font-mono); font-size: 13px; resize: vertical; }
+input[type="color"] { padding: 2px; height: 34px; cursor: pointer; }
+
+label { display: block; font-size: 13px; color: var(--color-text-secondary); margin-bottom: 4px; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 100px;
+}
+.badge-success { background: var(--color-success-bg); color: var(--color-success-text); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.badge-danger  { background: var(--color-danger-bg);  color: var(--color-danger-text); }
+.badge-neutral { background: var(--color-surface-2); color: var(--color-text-secondary); }
+
+.card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+/* 2026-07-13: promoted from IdentityEditor.razor's local <style> block,
+   where every other editor tab (ContentEditor/TokenEditor/
+   AdvancedJsonEditor/ActivityTable, plus the four new ones this date)
+   was silently depending on it via DOM ordering — these rules only
+   existed while IdentityEditor's own <style> tag happened to still be
+   mounted, which is true in the common case (Identitet is _tabs[0], so
+   it mounts first and its <style> tag lingers) but not guaranteed. Some
+   individual editor files also still carry their own local copy of
+   these same rules; that's harmless duplication, not a conflict — this
+   is just what actually GUARANTEES the styling regardless of which tab
+   loads first or whether Blazor ever tears down and re-mounts one in
+   isolation. */
+.editor-pane { padding: 20px 24px 60px; max-width: 720px; }
+.editor-pane--wide { max-width: 860px; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
+.chip-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.chip-edit { display: flex; gap: 8px; align-items: center; padding: 8px; }
+@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Delade sidklasser ──────────────────────────────────────────────────────
+   Används av CreatePackPage, PackListPage, MyAppsPage, PackEditorPage,
+   ActivityTable och AdvancedJsonEditor. Hör hemma här (globalt) och inte i
+   ett enskilt sid-<style>-block — en Razor-komponents inline <style>-tagg
+   hoistas inte till <head>, den försvinner ur DOM så fort just den
+   komponenten avmonteras, vilket gjorde att sidorna ovan tappade all denna
+   styling så fort MyAppsPage inte råkade vara monterad samtidigt. */
+.apps-page { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+.apps-page__header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.apps-page__logo { height: 40px; }
+.apps-page__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.apps-page__card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  text-align: left; padding: 16px; height: 96px;
+  background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius);
+}
+.apps-page__card--new { align-items: center; justify-content: center; color: var(--color-accent); }
+.apps-page__error { color: var(--color-danger-text); font-size: 13px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.modal { max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* ── Layout: mobilt (< 900px) är förvalet — botten-nav, en panel i taget ── */
+
+.app-shell { display: flex; flex-direction: column; height: 100%; }
+.app-shell__body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.app-shell__nav-sidebar { display: none; }
+.app-shell__bottom-nav { display: flex; }
+.app-shell__content { flex: 1; min-width: 0; overflow-y: auto; }
+.app-shell__preview-panel { display: none; }
+
+/* ── Tablet/bärbar (≥ 900px): två paneler — smal ikon-rad + innehåll ── */
+@media (min-width: 900px) {
+  .app-shell__nav-sidebar { display: flex; width: 72px; }
+  .app-shell__nav-sidebar .nav-label { display: none; }
+  .app-shell__bottom-nav { display: none; }
+}
+
+/* ── Desktop (≥ 1400px): tre paneler — full sidnav + editor + permanent preview ── */
+@media (min-width: 1400px) {
+  .app-shell__nav-sidebar { width: var(--nav-width); }
+  .app-shell__nav-sidebar .nav-label { display: inline; }
+  .app-shell__preview-panel { display: flex; width: 340px; flex-shrink: 0; }
+}

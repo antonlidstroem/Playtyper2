@@ -1,0 +1,140 @@
+@page "/preview-frame"
+@using Playtypus.Core.Components
+@using Playtypus.Core.Services
+@inject PackContext Pack
+@inject ThemeService Theme
+@inject FavoritesService Favorites
+@inject DoneTrackingService Done
+@inject UserPreferencesService Prefs
+@inject HapticService Haptics
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@*
+    Renders inside an <iframe> only — see PreviewPanel.razor and
+    PreviewAdapter.cs's class doc comments for why this is a whole separate
+    routed page instead of a component PreviewPanel renders directly. In one
+    line: Playtypus.Core's global CSS and Playtyper's own chrome CSS both
+    declare bare body/button/a/input rules, and loading both in one document
+    lets whichever loads last win those rules for the ENTIRE document, not
+    just a preview subtree. This page's whole job is to be that other
+    document — no Playtyper nav, no Playtyper chrome, nothing here but a
+    real, live AppShell.
+
+    Uses EmptyLayout (the app's default — see PlaytyperApp.razor) same as
+    every other route. That's deliberate, not an oversight: EmptyLayout is
+    already just ".app-root { height:100vh; overflow-y:auto } + @Body", and
+    AppShell already manages its own internal overflow regardless of what
+    wraps it (see PackEditorPage using the exact same layout today) — there
+    is nothing left to strip out by writing a second, more-minimal layout.
+*@
+
+<div class="preview-frame-page">
+    @if (_assetsReady && Pack.IsLoaded)
+    {
+        <Playtypus.Core.Components.AppShell Pack="Pack" Favorites="Favorites" Done="Done" Prefs="Prefs" Haptics="Haptics"
+                                            PackId="@_packId" PreferredLanguage="@_preferredLanguage" />
+    }
+else if (_error != null)
+{
+    <div class="preview-frame-page__status">
+        <p>Kunde inte visa förhandsvisningen.</p>
+        <p class="preview-frame-page__error">@_error</p>
+    </div>
+}
+else
+{
+    <div class="preview-frame-page__status">
+        <div class="spinner"></div>
+    </div>
+}
+</div>
+
+<style>
+    /* Playtyper's own app.css is still loaded here too (same index.html as
+       every other route — see the comment above), so re-use its tokens
+       rather than hardcoding colors — this bit of chrome is Playtyper's,
+       not Playtypus's, right up until AppShell itself takes over below it. */
+    .preview-frame-page__status {
+        height: 100vh; display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 10px;
+    }
+    .preview-frame-page__error {
+        font-size: 12px; color: var(--color-text-secondary); max-width: 280px; text-align: center;
+    }
+</style>
+
+@code {
+    private DotNetObjectReference<PreviewFramePage>? _selfRef;
+    private bool _assetsReady;
+    private string _packId = "preview";
+    private string? _preferredLanguage;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            // Must finish before AppShell's first render — AppShell/ThemeService
+            // call straight into window.playtypusTheme etc. on init, which
+            // playtypus.js (loaded here) is what defines. See
+            // preview-bridge.js's injectPlaytypusAssets doc comment for why
+            // this happens here instead of a static <script> in index.html.
+            await JS.InvokeVoidAsync("playtyperPreviewBridge.injectPlaytypusAssets");
+            _assetsReady = true;
+
+            _selfRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("playtyperPreviewBridge.listenForData", _selfRef);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Invoked from JS (preview-bridge.js) once per parent-side edit.</summary>
+    [JSInvokable]
+    public async Task OnDataReceived(string json)
+    {
+        try
+        {
+            await PreviewAdapter.ApplyAsync(Pack, Theme, json);
+        }
+        catch (Exception ex)
+        {
+            // Malformed/partial message — keep showing whatever was already
+            // rendered rather than blanking the whole preview over one bad
+            // sync; the next edit will retry with a fresh payload. Only
+            // surfaces the error screen if there was nothing on screen yet.
+            if (!Pack.IsLoaded) { _error = ex.Message; StateHasChanged(); }
+            return;
+        }
+
+        _packId = Pack.Config?.PackId is { Length: > 0 } id ? id : "preview";
+        _error = null;
+        // AppShell's PreferredLanguage parameter only matters on ITS OWN
+        // first render (see AppShell.LoadPack's alreadyLoaded branch — after
+        // that it reads everything through Pack.Lang directly), but keeping
+        // it in sync costs nothing and avoids depending on that not changing.
+        _preferredLanguage = Pack.Lang.ActiveLanguage;
+        StateHasChanged();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        // No corresponding JS-side teardown call: the only listener living in
+        // this document (window.addEventListener('message', ...) inside
+        // listenForData) dies with this document itself. This component's
+        // lifetime IS the iframe's lifetime in every normal case — nothing
+        // in this app ever Router-navigates an iframe away from
+        // /preview-frame — so in practice the browser tears the whole thing
+        // down before this even runs. Still implemented properly rather than
+        // relying on that, in case that assumption ever stops being true.
+        _selfRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
