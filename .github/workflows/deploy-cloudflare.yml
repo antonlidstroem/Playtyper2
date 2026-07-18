@@ -45,4 +45,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4" # 3.90.0 (actionens nuvarande default) saknar stöd för
+          # assets-only Workers (ingen "main") - failar med "Missing entry-point"
           command: deploy
