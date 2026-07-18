@@ -1,0 +1,19 @@
+{
+  // Namnet blir en del av standard-URL:en: https://playtyper.<ditt-cf-subdomain>.workers.dev
+  // Byt gärna till något annat - måste bara vara unikt inom ditt Cloudflare-konto.
+  "name": "playtyper",
+  "compatibility_date": "2026-07-18",
+
+  // Playtyper.Web är en ren Blazor WASM-app (ingen server-kod), så det här
+  // är en "assets-only" Worker: bara statiska filer, inget "main"-script.
+  "assets": {
+    // Måste matcha var `dotnet publish` lägger wwwroot - se workflow-filen
+    // (`dotnet publish ... -o publish-output`), relativt repo-roten.
+    "directory": "./publish-output/wwwroot",
+    // Ger klientside-routing (Blazor Router) samma effekt som 404.html-tricket
+    // i GitHub Pages-workflowen: okända sökvägar (t.ex. /pack/abc123 vid en
+    // direktlänk/refresh) serverar index.html istället för en riktig 404,
+    // så Blazor själv hinner ta över och navigera rätt.
+    "not_found_handling": "single-page-application"
+  }
+}

@@ -1,0 +1,48 @@
+name: Deploy Playtyper.Web till Cloudflare
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/Playtyper.Web/**"
+      - "src/Playtyper.Shared/**"
+      - "global.json"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-cloudflare.yml"
+  workflow_dispatch: # gör att du kan trigga en deploy manuellt från Actions-fliken
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Playtyper
+        uses: actions/checkout@v4
+
+      # Se motsvarande kommentar i deploy-pages.yml: Playtyper.Shared beror
+      # på det privata NuGet-paketet Playtypus.Core. PLAYTYPUS_TOKEN måste
+      # redan finnas som secret i repot (samma en som GitHub Pages-workflowen
+      # använder) - annars failar restore-steget nedan på 401/403.
+      - name: Sätt upp .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Installera wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publicera Playtyper.Web (Release)
+        env:
+          PLAYTYPUS_NUGET_PAT: ${{ secrets.PLAYTYPUS_TOKEN }}
+        run: dotnet publish src/Playtyper.Web/Playtyper.Web.csproj -c Release -o publish-output
+
+      # Till skillnad från GitHub Pages-workflowen behövs ingen <base href>-
+      # omskrivning här: Cloudflare Workers serverar från domänens rot
+      # (workers.dev-subdomänen eller en egen domän), inte en undermapp.
+      # SPA-fallbacken (404 -> index.html) sköts av wrangler.jsonc:s
+      # "not_found_handling" istället för en kopierad 404.html.
+      - name: Deploy till Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
