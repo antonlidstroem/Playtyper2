@@ -5,25 +5,38 @@
 <div class="apps-page">
     <div class="apps-page__header">
         <button class="ghost" @onclick='() => Nav.NavigateTo("apps/browse")'>← Tillbaka</button>
-        <div style="flex:1"><h2>Nytt pack — AI-genererat</h2></div>
+        <div style="flex:1"><h2>Nytt pack — med hjälp av AI</h2></div>
     </div>
 
-    <p style="color:var(--color-text-secondary);max-width:640px">
-        Samma flöde som Packwizard idag: Playtyper genererar en detaljerad prompt utifrån
-        formuläret nedan. Du klistrar in den i Claude.ai eller Claude Code, klistrar tillbaka
-        svaret här, och Playtyper packar upp filerna — i två steg (identitet/tema, sedan
-        aktiviteter/översättningar) eftersom det ger bättre resultat än att be om allt på en gång.
+    <p class="help-text" style="max-width:640px">
+        Det här är ett snabbare sätt att komma igång än att fylla i allt för hand: du beskriver appen kort i formuläret nedan, Playtyper skriver en detaljerad instruktion (en "prompt") utifrån det, och du klistrar in den hos Claude. Claude skriver då själva innehållsfilerna åt dig, som du klistrar tillbaka här. Det görs i två omgångar — först identitet och utseende, sedan aktiviteter och texter — eftersom Claude ger bättre resultat när det får fokusera på en sak i taget, snarare än allt på en gång.
     </p>
+    <p class="field-note" style="max-width:640px;margin-top:-4px">
+        Håll den här fliken öppen tills du är klar — det som fylls i sparas bara i webbläsarens minne under tiden, inte till GitHub förrän på det allra sista steget.
+    </p>
+
+    <div class="wizard-steps">
+        @foreach (var step in StepDefinitions)
+        {
+            <div class="wizard-step @(step.Number <= CurrentStepNumber ? "wizard-step--done" : "") @(step.Number == CurrentStepNumber ? "wizard-step--current" : "")">
+                <span class="wizard-step__dot">@step.Number</span>
+                <span class="wizard-step__label">@step.Label</span>
+            </div>
+        }
+    </div>
 
     @if (_step == Step.Brief)
     {
         <div class="card" style="max-width:640px">
-            <h3>1. Grundinformation</h3>
-            <label>Kund-ID (kebab-case)</label>
+            <h3>Grundinformation</h3>
+            <p class="help-text help-text--tight">Kort information om appen — ju mer du fyller i, desto bättre blir det Claude skriver åt dig. Du kan alltid ändra allt efteråt inne i Playtyper.</p>
+
+            <label>Kund-ID</label>
+            <p class="field-note" style="margin:-2px 0 4px">En kort teknisk identifierare, bara små bokstäver/siffror/bindestreck (t.ex. <code>borasstad</code>). Går inte att ändra senare.</p>
             <input @bind="_brief.PackId" placeholder="borasstad" />
             <label style="margin-top:8px">App-namn</label>
             <input @bind="_brief.AppName" placeholder="Borås Stad" />
-            <label style="margin-top:8px">Tagline</label>
+            <label style="margin-top:8px">Tagline <span class="field-note">(en kort undertext)</span></label>
             <input @bind="_brief.Tagline" placeholder="Din guide till en tryggare vardag" />
             <label style="margin-top:8px">Beskrivning</label>
             <textarea @bind="_brief.Description" rows="2" placeholder="Vad är appen till för?"></textarea>
@@ -45,57 +58,99 @@
                 </div>
             </div>
 
-            <label style="margin-top:8px">Kategorier <span style="color:var(--color-text-muted)">(kommaseparerat)</span></label>
+            <label style="margin-top:8px">Kategorier <span class="field-note">(kommaseparerat)</span></label>
             <input @bind="_categoriesRaw" placeholder="Andning, Rörelse, Vila, Kontakt" />
 
-            <label style="margin-top:8px">Antal aktiviteter (mål)</label>
+            <label style="margin-top:8px">Antal aktiviteter <span class="field-note">(ett ungefärligt mål — Claude bestämmer det exakta antalet)</span></label>
             <input type="number" @bind="_brief.TargetActivityCount" />
 
-            <button class="primary" style="margin-top:16px" @onclick="GeneratePhase1">Generera prompt (steg 1)</button>
+            <button class="primary" style="margin-top:16px" @onclick="GeneratePhase1" disabled="@(string.IsNullOrWhiteSpace(_brief.PackId) || string.IsNullOrWhiteSpace(_brief.AppName))">Skriv instruktionen</button>
         </div>
     }
     else if (_step == Step.Phase1Prompt)
     {
         <div class="card" style="max-width:720px">
-            <h3>2. Klistra in i Claude</h3>
-            <p style="color:var(--color-text-secondary);font-size:13px">Kopiera hela prompten nedan till Claude.ai eller Claude Code.</p>
+            <h3>Klistra in hos Claude</h3>
+            <p class="help-text help-text--tight">Kopiera hela texten nedan och klistra in den som ett nytt meddelande till Claude (på claude.ai, eller i Claude Code).</p>
             <textarea readonly rows="14" style="font-size:12px">@_phase1Prompt</textarea>
-            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase1">Kopiera prompt</button>
+            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase1">Kopiera instruktionen</button>
 
-            <h3 style="margin-top:20px">3. Klistra in svaret</h3>
+            <h3 style="margin-top:20px">Klistra in svaret här</h3>
+            <p class="help-text help-text--tight">När Claude svarat, kopiera hela svaret (inte bara delar av det) och klistra in det nedan.</p>
             <textarea @bind="_phase1Response" rows="14" placeholder="Klistra in Claudes fullständiga svar här…"></textarea>
             @if (_error != null)
             {
-                <p class="apps-page__error">@_error</p>
+                <p class="apps-page__error"><span class="badge badge-danger">Fel</span> @_error</p>
             }
-            <button class="primary" style="margin-top:8px" @onclick="ParsePhase1">Tolka svaret och fortsätt</button>
+            <button class="primary" style="margin-top:8px" @onclick="ParsePhase1">Läs in svaret och fortsätt</button>
         </div>
     }
     else if (_step == Step.Phase2Prompt)
     {
         <div class="card" style="max-width:720px">
-            <p class="badge badge-success">Identitet och tema tolkades (@_phase1Files.Count filer)</p>
-            <h3 style="margin-top:12px">4. Klistra in nästa prompt i Claude</h3>
-            <p style="color:var(--color-text-secondary);font-size:13px">Samma konversation — be Claude fortsätta med aktiviteterna.</p>
+            <p class="badge badge-success">✓ Identitet och utseende är inläst (@_phase1Files.Count filer)</p>
+            <h3 style="margin-top:12px">Klistra in nästa instruktion hos Claude</h3>
+            <p class="help-text help-text--tight">Samma konversation som innan — Claude fortsätter nu med själva aktiviteterna och innehållet.</p>
             <textarea readonly rows="14" style="font-size:12px">@_phase2Prompt</textarea>
-            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase2">Kopiera prompt</button>
+            <button class="ghost" style="margin-top:8px" @onclick="CopyPhase2">Kopiera instruktionen</button>
 
-            <h3 style="margin-top:20px">5. Klistra in svaret</h3>
+            <h3 style="margin-top:20px">Klistra in svaret här</h3>
             <textarea @bind="_phase2Response" rows="14" placeholder="Klistra in Claudes fullständiga svar här…"></textarea>
             @if (_error != null)
             {
-                <p class="apps-page__error">@_error</p>
+                <p class="apps-page__error"><span class="badge badge-danger">Fel</span> @_error</p>
             }
             <button class="primary" style="margin-top:8px" @onclick="ParsePhase2AndSave" disabled="@_saving">
-                @if (_saving) { <span class="spinner"></span> <text>Skriver till GitHub…</text> } else { <text>Tolka svaret och skapa packet</text> }
+                @if (_saving) { <span class="spinner"></span> <text>Skriver till GitHub…</text> } else { <text>Läs in svaret och skapa appen</text> }
             </button>
         </div>
     }
 </div>
 
+<style>
+    .wizard-steps { display: flex; align-items: flex-start; gap: 4px; max-width: 640px; margin: 18px 0 22px; }
+    .wizard-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .wizard-step__dot {
+        display: flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+        background: var(--color-surface-2); color: var(--color-text-muted);
+        font-size: 12px; font-weight: 600; border: 1px solid var(--color-border);
+    }
+    .wizard-step__label { font-size: 11px; color: var(--color-text-muted); text-align: center; line-height: 1.3; }
+    .wizard-step--done .wizard-step__dot { background: var(--color-accent-soft); color: var(--color-accent); border-color: var(--color-accent); }
+    .wizard-step--current .wizard-step__dot { background: var(--color-accent); color: var(--color-accent-text); border-color: transparent; }
+    .wizard-step--current .wizard-step__label { color: var(--color-text-primary); font-weight: 600; }
+    @@media (max-width: 480px) { .wizard-step__label { display: none; } }
+</style>
+
 @code {
     private enum Step { Brief, Phase1Prompt, Phase2Prompt }
     private Step _step = Step.Brief;
+
+    /// <summary>
+    /// Stegindikatorn i markupen visar fem numrerade punkter (steg 2 och 4
+    /// har egentligen två halvor var — "kopiera instruktion" och "klistra
+    /// in svar" — men det räcker att indikatorn hoppar från 2→3 respektive
+    /// 4→5 när halvan byts, den behöver inte modellera det som ett eget
+    /// tillstånd). CurrentStepNumber returnerar 1-5, aldrig en dubbeltydig
+    /// enum-jämförelse.
+    /// </summary>
+    private int CurrentStepNumber => _step switch
+    {
+        Step.Brief => 1,
+        Step.Phase1Prompt => string.IsNullOrEmpty(_phase1Response) ? 2 : 3,
+        Step.Phase2Prompt => string.IsNullOrEmpty(_phase2Response) ? 4 : 5,
+        _ => 1,
+    };
+
+    private static readonly (int Number, string Label)[] StepDefinitions =
+    {
+        (1, "Beskriv appen"),
+        (2, "Kopiera instruktion"),
+        (3, "Klistra in svar"),
+        (4, "Kopiera nästa instruktion"),
+        (5, "Klistra in svar"),
+    };
 
     private readonly PackBrief _brief = new();
     private string _categoriesRaw = "";

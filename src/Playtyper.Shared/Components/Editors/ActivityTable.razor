@@ -4,6 +4,8 @@
    JSON-serialiseringen och nås vid behov via Avancerat-fliken. *@
 
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["activities"].Summary</p>
+
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
         <h3 style="margin:0">Aktiviteter</h3>
         <select @bind="_lang" style="width:auto">
@@ -31,8 +33,12 @@
     </div>
 
     <h3 style="margin-top:28px">Moduler <span style="font-size:12px;font-weight:400;color:var(--color-text-muted)">@Draft.Config.Modules.Count</span></h3>
-    <p style="color:var(--color-text-secondary);font-size:13px;margin:2px 0 4px">
-        Ordnade, låsbara aktivitetssekvenser. Kräver features.progressionLock = true (se Innehåll-fliken) för att faktiskt låsas i appen — utan den flaggan visas modulens aktiviteter olåsta som vanligt.
+    <p class="help-text help-text--tight">
+        Grupperar aktiviteter i en bestämd ordning som besökaren låser upp steg för steg — till exempel en kurs där man måste klara steg 1 innan steg 2 öppnas.
+        <details class="info-note">
+            <summary>?</summary>
+            <span class="info-note__body">För att modulerna faktiskt ska VISAS som låsta i appen (inte bara ordnade) måste du även slå på "Moduler med låsta aktiviteter i ordning" under Innehåll-fliken. Utan den är aktiviteterna grupperade men olåsta — besökaren kan öppna dem i valfri ordning.</span>
+        </details>
     </p>
     <div class="module-list">
         @foreach (var module in Draft.Config.Modules)
@@ -54,7 +60,7 @@
                     <div style="grid-column:1/-1">
                         <label>Låses upp efter</label>
                         <select @bind="module.UnlockAfter" @bind:after="Notify">
-                            <option value="none">none (alltid olåst)</option>
+                            <option value="none">Ingen — den här modulen är alltid olåst</option>
                             @foreach (var other in Draft.Config.Modules.Where(m => m != module))
                             {
                                 <option value="@other.Id">@other.TitleKey (@other.Id)</option>
@@ -86,7 +92,7 @@
     .module-item { padding: 12px; }
     .module-item__activities { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 180px; overflow-y: auto; padding: 6px; border: 1px solid var(--color-border); border-radius: 6px; }
     .module-activity-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger-text); }
 </style>
 
 @if (_selected != null)
@@ -102,14 +108,14 @@
                 <div><label>Kategori</label><input @bind="_selected.Category" @bind:event="oninput" @bind:after="Notify" /></div>
                 <div><label>Nivå (1-3)</label><input type="number" min="0" max="3" @bind="_selected.Level" @bind:event="oninput" @bind:after="Notify" /></div>
                 <div><label>Förberedelsetid (min)</label><input type="number" @bind="_selected.PrepTimeMinutes" @bind:event="oninput" @bind:after="Notify" /></div>
-                <div><label>Kräver rekvisita</label>
+                <div><label>Kräver rekvisita <span style="color:var(--color-text-muted)">(saker/material besökaren behöver ha till hands)</span></label>
                     <select @bind="_selected.RequiresProps" @bind:after="Notify">
                         <option value="false">Nej</option>
                         <option value="true">Ja</option>
                     </select>
                 </div>
                 <div style="grid-column:1/-1">
-                    <label>Steg <span style="color:var(--color-text-muted)">(en rad per steg)</span></label>
+                    <label>Steg <span style="color:var(--color-text-muted)">(en rad per steg — visas som en numrerad lista för besökaren)</span></label>
                     <textarea rows="4" value="@string.Join("\n", _selected.Steps)" @onchange="e => SetSteps(e.Value?.ToString())"></textarea>
                 </div>
                 <div style="grid-column:1/-1">

@@ -6,7 +6,7 @@
 
 <div class="connect-page">
     <div class="connect-page__card card">
-        <img src="_content/Playtyper.Shared/img/logo.png" alt="Playtyper" class="connect-page__logo" />
+        <img src="_content/Playtyper.Shared/img/logo.png" alt="Playtyper" class="brand-mark brand-mark--lg" style="margin-bottom:12px" />
 
         @if (_checkingSaved)
         {
@@ -16,33 +16,41 @@
         {
             <h2>Anslut till GitHub</h2>
             <p style="color:var(--color-text-secondary)">
-                Playtyper skriver aldrig till en egen server — allt (packs, bundle, CI-workflow)
-                läses och skrivs direkt mot GitHub med ett Personal Access Token. Token lagras
-                bara för den här sessionen (rensas när du stänger fliken).
+                Playtyper har ingen egen server som lagrar dina appar — allt du gör här läses och sparas
+                direkt i GitHub, samma ställe där koden för dina Playtypus-appar redan bor. För att
+                Playtyper ska få göra det behöver du visa upp en nyckel som bevisar att det är okej:
+                ett <strong>Personal Access Token</strong> (förkortas ofta <strong>PAT</strong>).
+                Tänk på det som ett tillfälligt passerkort du skapar själv på GitHub — det lagras bara
+                i den här webbläsarfliken och försvinner när du stänger den.
             </p>
 
             <details class="connect-page__howto" open="@(_error != null)">
-                <summary>Så skapar du ett token (under en minut)</summary>
+                <summary>Så skapar du ett token (tar under en minut)</summary>
+                <p class="help-text help-text--tight">Allt nedan görs på github.com, inte i Playtyper.</p>
                 <ol>
-                    <li>github.com → din profilbild → <strong>Settings</strong></li>
-                    <li><strong>Developer settings</strong> (längst ner i vänstermenyn)</li>
+                    <li>Logga in på <strong>github.com</strong> → klicka på din profilbild uppe till höger → <strong>Settings</strong></li>
+                    <li>Scrolla längst ner i menyn till vänster → <strong>Developer settings</strong></li>
                     <li><strong>Personal access tokens → Fine-grained tokens → Generate new token</strong></li>
-                    <li>Resource owner: dig själv, eller din organisation</li>
-                    <li>Repository access: <strong>"All repositories"</strong> — krävs för att Playtyper ska kunna skapa nya kund-repon åt dig, inte bara redigera befintliga</li>
-                    <li>Permissions → Repository permissions:
+                    <li>Under <strong>Resource owner</strong>: välj dig själv, eller din organisation om apparna ligger där</li>
+                    <li>
+                        Under <strong>Repository access</strong>, välj <strong>"All repositories"</strong>.
+                        <span class="field-note">Det krävs för att Playtyper ska kunna skapa NYA kundrepon åt dig — inte bara redigera de som redan finns.</span>
+                    </li>
+                    <li>
+                        Under <strong>Permissions → Repository permissions</strong>, sätt dessa fyra till <strong>"Read and write"</strong>:
                         <ul>
-                            <li><code>Contents</code> → Read and write</li>
-                            <li><code>Workflows</code> → Read and write</li>
-                            <li><code>Administration</code> → Read and write</li>
-                            <li><code>Secrets</code> → Read and write</li>
+                            <li><code>Contents</code> <span class="field-note">— för att kunna läsa och spara själva app-innehållet</span></li>
+                            <li><code>Workflows</code> <span class="field-note">— för att kunna sätta igång byggen av appen</span></li>
+                            <li><code>Administration</code> <span class="field-note">— för att kunna skapa nya repon</span></li>
+                            <li><code>Secrets</code> <span class="field-note">— för att kunna lägga in de hemliga nycklar driftsättningen behöver (mer om det på Deploy-sidan senare)</span></li>
                         </ul>
                     </li>
-                    <li>Generate token → kopiera värdet (visas bara en gång)</li>
+                    <li><strong>Generate token</strong> längst ner → kopiera koden som visas <span class="field-note">(den visas bara den här enda gången — om du missar den får du skapa ett nytt)</span></li>
                 </ol>
             </details>
 
             <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
-                <label for="pat">GitHub Personal Access Token</label>
+                <label for="pat">Klistra in ditt token här</label>
                 <input id="pat" type="text" placeholder="github_pat_…" @bind="_token" @bind:event="oninput"
                        autocomplete="off" spellcheck="false" disabled="@_validating" />
 
@@ -54,7 +62,7 @@
                 <button type="submit" class="primary" disabled="@(_validating || string.IsNullOrWhiteSpace(_token))" style="margin-top:12px;width:100%;">
                     @if (_validating)
                     {
-                        <span class="spinner"></span> <text>Validerar…</text>
+                        <span class="spinner"></span> <text>Kontrollerar…</text>
                     }
                     else
                     {
@@ -69,7 +77,6 @@
 <style>
     .connect-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
     .connect-page__card { max-width: 440px; width: 100%; }
-    .connect-page__logo { height: 56px; margin-bottom: 12px; }
     .connect-page__howto { margin: 14px 0; font-size: 13px; color: var(--color-text-secondary); }
     .connect-page__howto summary { cursor: pointer; color: var(--color-accent); font-weight: 600; }
     .connect-page__howto ol { padding-left: 20px; }

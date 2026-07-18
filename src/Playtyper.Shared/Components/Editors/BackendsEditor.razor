@@ -6,9 +6,10 @@
    verktyg för att sätta ett pack-lösenord. *@
 
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["backends"].Summary</p>
 
     <h3>Backends <span class="count-badge">@Draft.Config.Backends.Count</span></h3>
-    <p class="section-hint">Namngivna serveranslutningar som aktiviteter kan referera till via backendRef.</p>
+    <p class="section-hint">Varje rad är en namngiven anslutning till en extern server. En aktivitet kan sedan koppla sig till en av dessa (via dess Id) för att hämta eller spara data där.</p>
     <div class="stack-list">
         @foreach (var backend in Draft.Config.Backends)
         {
@@ -19,36 +20,38 @@
                         <input @bind="backend.Id" @bind:event="oninput" @bind:after="Notify" />
                     </div>
                     <div>
-                        <label>Auth-läge</label>
+                        <label>Inloggningskrav</label>
                         <select @bind="backend.AuthMode" @bind:after="Notify">
-                            <option value="none">none (öppet API)</option>
-                            <option value="jwt">jwt (användarens inloggning)</option>
-                            <option value="apikey">apikey (statisk nyckel)</option>
+                            <option value="none">Inget — öppet för alla</option>
+                            <option value="jwt">Besökarens egen inloggning krävs</option>
+                            <option value="apikey">En delad nyckel (samma för alla besökare)</option>
                         </select>
                     </div>
                     <div style="grid-column:1/-1">
-                        <label>Bas-URL</label>
+                        <label>Webbadress</label>
                         <input @bind="backend.BaseUrl" @bind:event="oninput" @bind:after="Notify" placeholder="https://exempel.se/api" />
                     </div>
                     <div>
-                        <label>SignalR-hub <span class="field-note">(valfri — realtid)</span></label>
+                        <label>Realtidskanal <span class="field-note">(valfri)</span></label>
                         <input value="@backend.SignalRHub" @onchange="e => { backend.SignalRHub = e.Value?.ToString(); Notify(); }" placeholder="/hubs/lista" />
+                        <span class="field-note">Bara relevant om servern stödjer direktuppdateringar (t.ex. att en lista uppdateras hos alla besökare samtidigt, utan att någon behöver ladda om). Lämna tomt annars.</span>
                     </div>
                     <div>
-                        <label>Cache (minuter offline)</label>
+                        <label>Cache <span class="field-note">(minuter, offline)</span></label>
                         <input type="number" min="0" @bind="backend.CacheTtlMinutes" @bind:after="Notify" />
+                        <span class="field-note">Hur länge besökarens app får visa senast hämtade data om de tillfälligt saknar internet.</span>
                     </div>
                     @if (backend.AuthMode == "apikey")
                     {
                         <div style="grid-column:1/-1">
-                            <label>API-nyckel</label>
+                            <label>Den delade nyckeln</label>
                             <input value="@backend.ApiKey" @onchange="e => { backend.ApiKey = e.Value?.ToString(); Notify(); }" />
                         </div>
                     }
                     else if (backend.AuthMode == "jwt")
                     {
                         <div style="grid-column:1/-1">
-                            <label>JWT-audience <span class="field-note">(valfri valideringshint)</span></label>
+                            <label>Mottagare-id <span class="field-note">(valfri — en extra kontrollkod servern kan begära)</span></label>
                             <input value="@backend.JwtAudience" @onchange="e => { backend.JwtAudience = e.Value?.ToString(); Notify(); }" />
                         </div>
                     }
@@ -62,29 +65,42 @@
     <h3 style="margin-top:28px">Lösenordsskydd</h3>
     <label class="toggle-row">
         <input type="checkbox" checked="@(Draft.Config.Auth?.Enabled ?? false)" @onchange="ToggleAuth" />
-        Kräv lösenord för att öppna paketet
+        Kräv lösenord för att öppna appen
     </label>
+    <p class="help-text help-text--tight">Bra om appen innehåller något som inte ska vara öppet för vem som helst — besökaren måste ange lösenordet en gång innan de kommer in.</p>
     @if (Draft.Config.Auth is { } auth)
     {
         <div class="field-grid" style="margin-top:8px">
             <div>
-                <label>Nytt lösenord <span class="field-note">(hashas direkt, sparas aldrig i klartext)</span></label>
+                <label>Nytt lösenord</label>
                 <input type="password" @bind="_newPassword" @bind:event="oninput" @bind:after="() => ApplyPassword(auth)" placeholder="lämna tomt för att behålla nuvarande" />
+                <span class="field-note">Lösenordet skrivs aldrig till GitHub i klartext — det omvandlas direkt till en kod (en "hash", se nedan) som går att kontrollera mot, men inte gå baklänges ifrån.</span>
             </div>
             <div>
                 <label>Sessionslängd (timmar)</label>
                 <input type="number" min="1" @bind="auth.SessionHours" @bind:after="Notify" />
+                <span class="field-note">Hur länge besökaren slipper skriva in lösenordet igen efter första gången.</span>
             </div>
             <div style="grid-column:1/-1">
-                <label>Ledtråd <span class="field-note">(översättningsnyckel, valfri)</span></label>
+                <label>Ledtråd <span class="field-note">(valfri — en översättningsnyckel, samma slags fält som Rubrik/Brödtext på andra flikar, inte den färdiga texten direkt)</span></label>
                 <input value="@auth.HintKey" @onchange="e => { auth.HintKey = e.Value?.ToString(); Notify(); }" />
             </div>
         </div>
         <p class="field-note" style="margin-top:6px">
-            Nuvarande hash: <code>@(string.IsNullOrEmpty(auth.PasswordHash) ? "(inget lösenord satt än)" : auth.PasswordHash)</code>
+            @if (string.IsNullOrEmpty(auth.PasswordHash))
+            {
+                <text>Inget lösenord satt än — appen är i praktiken olåst tills du anger ett ovan.</text>
+            }
+            else
+            {
+                <text>Ett lösenord är satt. Den lagrade koden (inte lösenordet självt): <code>@auth.PasswordHash</code></text>
+            }
         </p>
 
-        <h4 style="margin-top:18px;margin-bottom:4px">Admin-inloggning <span class="field-note">(valfritt, separat från vanligt lösenord ovan)</span></h4>
+        <h4 style="margin-top:18px;margin-bottom:4px">Admin-inloggning <span class="field-note">(valfritt, ett separat lösenord för dig/redaktörer)</span></h4>
+        <p class="field-note" style="margin:-2px 0 6px">
+            Ger tillgång till extra redigeringsfunktioner direkt i appen (om sådana finns påslagna), utöver det vanliga besökarlösenordet ovan.
+        </p>
         <div class="field-grid">
             <div>
                 <label>Nytt admin-lösenord</label>
@@ -96,7 +112,14 @@
             </div>
         </div>
         <p class="field-note" style="margin-top:6px">
-            Admin-hash: <code>@(string.IsNullOrEmpty(auth.AdminPasswordHash) ? "(ingen adminåtkomst konfigurerad)" : auth.AdminPasswordHash)</code>
+            @if (string.IsNullOrEmpty(auth.AdminPasswordHash))
+            {
+                <text>Ingen adminåtkomst konfigurerad.</text>
+            }
+            else
+            {
+                <text>Ett admin-lösenord är satt. Den lagrade koden: <code>@auth.AdminPasswordHash</code></text>
+            }
         </p>
     }
 </div>
@@ -106,12 +129,11 @@
     .editor-pane--wide { max-width: 860px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
     .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
-    .field-note { color: var(--color-text-muted); font-size: 12px; }
     .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
     .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
     .stack-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
     .stack-item { padding: 12px; }
-    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger-text); }
     code { font-size: 11px; word-break: break-all; background: var(--color-surface-2); padding: 2px 5px; border-radius: 4px; }
     @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
 </style>

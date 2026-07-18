@@ -116,10 +116,29 @@ window.playtyperInterop = (function () {
         hasUnsavedChanges = !!value;
     }
 
+    // ── Ljust/mörkt läge (växling efter start) ───────────────────────────
+    // Den FÖRSTA appliceringen (innan CSS/Blazor laddar, för att undvika en
+    // flash av fel tema) sker i theme-boot.js, en liten inline-script i
+    // <head> som körs långt innan den här filen — se den filen för
+    // resonemanget och den fullständiga kommentaren. THEME_KEY måste vara
+    // exakt samma sträng i båda filerna, annars läser/skriver de olika
+    // localStorage-nycklar utan att någotdera felar synligt.
+    const THEME_KEY = "playtyper-theme";
+
+    function setTheme(theme) {
+        window.localStorage.setItem(THEME_KEY, theme);
+        document.documentElement.setAttribute("data-theme", theme);
+    }
+
+    function getTheme() {
+        return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    }
+
     return {
         sessionGet, sessionSet, sessionRemove,
         localGet, localSet, localRemove,
         draftSave, draftLoad, draftDelete, draftListKeys,
         setUnsavedChangesFlag,
+        setTheme, getTheme,
     };
 })();

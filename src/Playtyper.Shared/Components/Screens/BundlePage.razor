@@ -181,7 +181,7 @@
                         </div>
                         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
                             <button class="ghost" @onclick="RenewLicenseAsync" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Förnya @_renewYears år</button>
-                            <button class="ghost" style="color:var(--color-danger, #c0392b)" @onclick="() => _confirmRevoke = true" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Återkalla licens</button>
+                            <button class="ghost" style="color:var(--color-danger-text)" @onclick="() => _confirmRevoke = true" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Återkalla licens</button>
                         </div>
                         @if (_confirmRevoke)
                         {
@@ -193,7 +193,7 @@
                             </div>
                             <div style="display:flex;gap:8px;margin-top:6px">
                                 <button class="ghost" @onclick="() => _confirmRevoke = false">Avbryt</button>
-                                <button class="primary" style="background:var(--color-danger, #c0392b)" @onclick="RevokeLicenseAsync" disabled="@_licenseBusy">Bekräfta återkallning</button>
+                                <button class="danger-solid" @onclick="RevokeLicenseAsync" disabled="@_licenseBusy">Bekräfta återkallning</button>
                             </div>
                         }
                     </details>
@@ -223,7 +223,6 @@
     .bundle-editor { max-width: 720px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
     .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
-    .field-note { color: var(--color-text-muted); font-size: 12px; }
     .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
     .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
     .pack-checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }

@@ -36,6 +36,10 @@
     }
     else
     {
+        <p class="help-text" style="max-width:680px">
+            Driftsättning är sista steget — det som gör att den färdiga appen faktiskt blir tillgänglig för besökare, som en webbadress eller i Google Play. Det görs i två delar: först en engångskonfiguration (vilken plattform, och de nycklar bygget behöver), sedan ett tryck varje gång du faktiskt vill skicka ut en ny version.
+        </p>
+
         <div class="deploy-section card">
             <h3>Redo att driftsätta?</h3>
             @if (_loadingReadiness)
@@ -75,7 +79,7 @@
 
         <div class="deploy-section card">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-                <h3 style="margin:0">GitHub Actions-arbetsflöde</h3>
+                <h3 style="margin:0">1. Konfigurera bygget <span class="field-note">(engångsinställning — GitHub Actions)</span></h3>
                 @if (!_loadingWorkflowStatus)
                 {
                     @if (_workflowExists)
@@ -88,6 +92,9 @@
                     }
                 }
             </div>
+            <p class="help-text help-text--tight">
+                Bestämmer VAR appen ska publiceras och lagrar de nycklar (secrets) som krävs. Behöver bara göras en gång — kom tillbaka hit bara om du vill lägga till en plattform senare, eller byta en nyckel.
+            </p>
 
             @if (_loadingWorkflowStatus)
             {
@@ -116,10 +123,12 @@
                         <div>
                             <label>Playtypus-ramverksrepo</label>
                             <input @bind="_wfPlaytypusRepo" placeholder="org/playtypus" />
+                            <span class="field-note">Var själva app-koden (som ditt innehåll byggs in i) finns på GitHub.</span>
                         </div>
                         <div>
-                            <label>Ref (branch/tagg)</label>
+                            <label>Ref <span class="field-note">(branch/tagg)</span></label>
                             <input @bind="_wfPlaytypusRef" placeholder="main" />
+                            <span class="field-note">Vilken version av ramverket som ska användas — normalt "main".</span>
                         </div>
 
                         @if (_wfDeployWeb)
@@ -138,42 +147,47 @@
                         }
                     </div>
 
-                    <h4 style="margin-top:20px;margin-bottom:4px">Secrets</h4>
-                    <p style="font-size:12px;color:var(--color-text-muted);margin-top:0">
-                        Lämna ett fält tomt för att låta ett redan satt secret vara oförändrat.
+                    <h4 style="margin-top:20px;margin-bottom:4px">Nycklar (secrets)</h4>
+                    <p class="help-text help-text--tight" style="margin-top:0">
+                        Hemliga värden bygget behöver för att komma åt andra tjänster å dina vägnar. De sparas krypterat direkt hos GitHub — Playtyper varken lagrar eller kan läsa tillbaka dem efteråt. Lämna ett fält tomt för att låta ett redan sparat värde vara oförändrat.
                     </p>
                     <div class="field-grid">
                         <div style="grid-column:1/-1">
-                            <label>PLAYTYPUS_TOKEN <span style="color:var(--color-text-muted)">— GitHub PAT, Contents:Read på ramverksrepot</span></label>
+                            <label><code>PLAYTYPUS_TOKEN</code></label>
                             <input type="password" @bind="_wfPlaytypusToken" autocomplete="off" />
+                            <span class="field-note">Ett GitHub-token (samma sorts token du skapade för att ansluta Playtyper, men ett nytt) som ger bygget läsbehörighet till Playtypus-ramverkets kod. Skapas på github.com på samma sätt som du gjorde vid anslutningen — den här gången räcker det med "Contents: Read" på ramverksrepot.</span>
                         </div>
                         @if (_wfDeployWeb)
                         {
                             <div>
-                                <label>CLOUDFLARE_API_TOKEN</label>
+                                <label><code>CLOUDFLARE_API_TOKEN</code></label>
                                 <input type="password" @bind="_wfCloudflareApiToken" autocomplete="off" />
+                                <span class="field-note">Skapas i Cloudflare-kontot: Profil → API Tokens → Create Token.</span>
                             </div>
                             <div>
-                                <label>CLOUDFLARE_ACCOUNT_ID</label>
+                                <label><code>CLOUDFLARE_ACCOUNT_ID</code></label>
                                 <input type="password" @bind="_wfCloudflareAccountId" autocomplete="off" />
+                                <span class="field-note">Finns på Cloudflare-kontots översiktssida, högerspalten.</span>
                             </div>
                         }
                         @if (_wfDeployAndroid)
                         {
                             <div style="grid-column:1/-1">
-                                <label>ANDROID_KEYSTORE_BASE64 <span style="color:var(--color-text-muted)">— base64 av en befintlig .jks (genereras inte här, se README)</span></label>
+                                <label><code>ANDROID_KEYSTORE_BASE64</code></label>
                                 <textarea @bind="_wfAndroidKeystoreBase64" rows="3" style="width:100%;font-family:monospace;font-size:11px"></textarea>
+                                <span class="field-note">En Android-signeringsnyckel (.jks-fil), omvandlad till text. Skapas inte här i Playtyper — kräver Androids egna verktyg (keytool). Se projektets README för kommandot. Om appen redan publicerats tidigare: samma keystore måste återanvändas, annars kan inte uppdateringar installeras ovanpå den befintliga appen.</span>
                             </div>
                             <div>
-                                <label>ANDROID_KEY_ALIAS</label>
+                                <label><code>ANDROID_KEY_ALIAS</code></label>
                                 <input type="password" @bind="_wfAndroidKeyAlias" autocomplete="off" />
+                                <span class="field-note">Namnet du gav nyckeln när du skapade den ovan.</span>
                             </div>
                             <div>
-                                <label>ANDROID_KEY_PASSWORD</label>
+                                <label><code>ANDROID_KEY_PASSWORD</code></label>
                                 <input type="password" @bind="_wfAndroidKeyPassword" autocomplete="off" />
                             </div>
                             <div>
-                                <label>ANDROID_KEYSTORE_PASSWORD</label>
+                                <label><code>ANDROID_KEYSTORE_PASSWORD</code></label>
                                 <input type="password" @bind="_wfAndroidKeystorePassword" autocomplete="off" />
                             </div>
                         }
@@ -223,10 +237,9 @@
         </div>
 
         <div class="deploy-section card">
-            <h3>Skapa driftsättningstagg</h3>
-            <p style="color:var(--color-text-secondary)">
-                Skapar en tagg direkt på GitHub. Det är taggen — inte den här sidan — som faktiskt
-                startar bygget, via <code>on.push.tags</code> i @State.Repo.WorkflowFile.
+            <h3>2. Skicka ut en ny version</h3>
+            <p class="help-text help-text--tight">
+                Det här är steget du gör om och om igen, varje gång du vill publicera en ny version — steg 1 ovan behöver bara göras en gång. Det som faktiskt startar bygget är en liten markering ("tagg") som skapas direkt på GitHub; det är taggen, inte knappen här, som utlöser bygget (tekniskt: <code>on.push.tags</code> i @State.Repo.WorkflowFile).
             </p>
 
             <div class="field-grid">

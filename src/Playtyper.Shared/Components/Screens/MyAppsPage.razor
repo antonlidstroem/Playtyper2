@@ -6,7 +6,7 @@
 
 <div class="apps-page">
     <div class="apps-page__header">
-        <img src="_content/Playtyper.Shared/img/logo.png" alt="" class="apps-page__logo" />
+        <img src="_content/Playtyper.Shared/img/logo.png" alt="" class="brand-mark" />
         <div style="flex:1">
             <h2>Mina appar</h2>
             <p style="color:var(--color-text-secondary);margin:0">Inloggad som @State.Login</p>
@@ -42,7 +42,7 @@
         }
 
         <button class="ghost" style="margin-top:8px" @onclick="() => _showConnectForm = true">
-            Anslut till ett befintligt repo (org/repo)
+            Anslut till en app som redan finns på GitHub
         </button>
     }
 
@@ -55,29 +55,45 @@
 @if (_showCreateForm)
 {
     <div class="modal-backdrop" @onclick="() => _showCreateForm = false">
-        <div class="modal card" @onclick:stopPropagation="true">
-            <h3>Nytt kund-repo</h3>
-            <label>Kund-ID <span style="color:var(--color-text-muted)">(kebab-case, t.ex. borasstad)</span></label>
+        <div class="modal card modal--wide" @onclick:stopPropagation="true">
+            <h3>Ny kundapp</h3>
+            <p class="help-text help-text--tight">
+                Det här skapar en ny, tom app-mall och ett nytt GitHub-repo åt kunden. Du fyller i själva innehållet (aktiviteter, bilder, texter) efteråt, inne i Playtyper.
+            </p>
+
+            <label>Kund-ID</label>
+            <p class="field-note" style="margin:-2px 0 4px">
+                En kort, teknisk identifierare för kunden — bara små bokstäver, siffror och bindestreck (t.ex. <code>borasstad</code>). Används internt i filnamn och webbadresser, syns aldrig för kundens besökare. Går inte att ändra senare, så välj något kort och tydligt.
+            </p>
             <input @bind="_newCustomerId" @bind:event="oninput" placeholder="borasstad" />
 
-            <label style="margin-top:10px">App-namn</label>
+            <label style="margin-top:14px">App-namn</label>
+            <p class="field-note" style="margin:-2px 0 4px">Det riktiga namnet, det som visas i appen och på kundens hemskärm.</p>
             <input @bind="_newAppName" @bind:event="oninput" placeholder="Borås Stad" />
 
-            <label style="margin-top:10px">Android package-namn</label>
+            <label style="margin-top:14px">Paketnamn <span class="tab-badge tab-badge--muted">för Android</span></label>
+            <p class="field-note" style="margin:-2px 0 4px">
+                Androids interna namn på appen (formatet är alltid omvänt domännamn, typ <code>se.playtypus.borasstad</code>). Behövs bara om appen ska publiceras i Google Play — lämna tomt så föreslår vi ett åt dig.
+            </p>
             <input @bind="_newAppId" placeholder="@SuggestedAppId" />
 
-            <label style="margin-top:10px">Accentfärg</label>
+            <label style="margin-top:14px">Accentfärg</label>
+            <p class="field-note" style="margin:-2px 0 4px">Appens huvudfärg — går att ändra närsomhelst senare under Identitet-fliken.</p>
             <input type="color" @bind="_newAccentColor" />
 
-            <label style="margin-top:10px">GitHub-repo-namn</label>
+            <label style="margin-top:14px">Namn på GitHub-repot</label>
+            <p class="field-note" style="margin:-2px 0 4px">Var koden och innehållet faktiskt lagras på GitHub. Lämna tomt för ett föreslaget namn baserat på Kund-ID.</p>
             <input @bind="_newRepoName" placeholder="@SuggestedRepoName" />
 
-            <label style="margin-top:10px">Organisation <span style="color:var(--color-text-muted)">(tomt = ditt eget konto)</span></label>
+            <label style="margin-top:14px">Organisation <span class="field-note">(lämna tomt för ditt eget GitHub-konto)</span></label>
             <input @bind="_newOrg" />
 
-            <label style="display:flex;align-items:center;gap:8px;margin-top:10px">
-                <input type="checkbox" style="width:auto" @bind="_newIsPrivate" /> Privat repo (rekommenderas)
+            <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+                <input type="checkbox" style="width:auto" @bind="_newIsPrivate" /> Privat repo
             </label>
+            <p class="field-note" style="margin:2px 0 0 26px">
+                Rekommenderas — betyder att bara du (och de du bjuder in) kan se koden och innehållet på GitHub. Ett offentligt repo kan läsas av vem som helst.
+            </p>
 
             @if (_error != null)
             {
@@ -98,9 +114,13 @@
 {
     <div class="modal-backdrop" @onclick="() => _showConnectForm = false">
         <div class="modal card" @onclick:stopPropagation="true">
-            <h3>Anslut till befintligt repo</h3>
-            <label>org/repo</label>
+            <h3>Anslut till en app som redan finns</h3>
+            <p class="help-text help-text--tight">
+                Om appen redan har ett GitHub-repo (skapat i Playtyper tidigare, eller av någon annan), skriv in det här för att öppna det i den här webbläsaren också.
+            </p>
+            <label>Ägare/repo-namn</label>
             <input @bind="_connectOwnerRepo" placeholder="dittnamn/kundapp-repo" />
+            <p class="field-note" style="margin-top:2px">Hittar du på GitHub högst upp i webbläsarens adressfält när du har repot öppet: github.com/<strong>ägare/repo-namn</strong></p>
             @if (_error != null)
             {
                 <p class="apps-page__error">@_error</p>
@@ -127,7 +147,7 @@
     private string? _newCustomerId;
     private string? _newAppName;
     private string? _newAppId;
-    private string _newAccentColor = "#2F6F4F";
+    private string _newAccentColor = "#9F4D22"; // startvärde i formuläret — en kopparton från Playtypers egen palett (copper-6, se app.css); helt fristående från kundappens tema, som redigeras under Identitet-fliken efter att appen skapats
     private string? _newRepoName;
     private string? _newOrg;
     private bool _newIsPrivate = true;

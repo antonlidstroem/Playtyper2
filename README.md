@@ -6,6 +6,47 @@ strategin ni kom fram till innan kodningen började. Ingen egen backend:
 allt läses och skrivs direkt mot GitHubs REST-API med ett token du själv
 kontrollerar.
 
+## 2026-07-18: ny logotyp, koppar-identitet, pedagogiskt omarbetat GUI
+
+En separat omgång ovanpå den ursprungliga MVP:n nedan — samma kodbas,
+ingen ny arkitektur. Två mål: (1) en ny logotyp (näbbdjur i en play-triangel,
+koppar-metallrelief på svart) skulle implementeras och styra om hela den
+visuella identiteten, som tidigare var en generisk grön/beige palett utan
+koppling till varumärket; (2) gränssnittet skulle bli begripligt för någon
+utan programmeringsbakgrund, i grundflödet (Anslutning, Mina appar, de åtta
+redigeringsflikarna) — Avancerat-fliken och Deploy/Bundle-sidorna behöll sina
+facktermer med flit, eftersom den som når dit redan valt att gå djupare.
+
+Konkret:
+- Ny färgpalett i `wwwroot/css/app.css`, härledd genom faktisk pixelsampling
+  av logotypen (inte uppskattat för hand) — se filens egen kommentar för
+  kopparrampen. Båda lägena (ljust/mörkt) är fullt genomarbetade, inte bara
+  varandras invertering, och kontrollerade mot WCAG AA med samma
+  kontrastformel som `ContrastChecker.cs` redan använder på kundernas
+  pack-teman — rimligt att hålla samma mått på sitt eget gränssnitt.
+- En riktig ljust/mörkt-läge-växlare (`theme-boot.js` + `interop.js` +
+  knappen i `AppShell.razor`) — fanns inte tidigare trots att `app.css`
+  redan hade ett `[data-theme="dark"]`-block; det blocket var i praktiken
+  dött CSS innan den här omgången.
+- Ny app-ikon (beskuren till bara maskoten, ingen text) för Web/MAUI —
+  se den strukna punkten under "Vad som INTE är byggt än" nedan.
+- Ett nytt, fristående textlager (`HelpText.cs`) med vardagsspråks-
+  förklaringar — medvetet SKILT från `FeatureManifest.cs`, som förblir
+  oförändrad och fortsätter vara AI-promptens källa. Se `HelpText.cs`s
+  egen klassdoc för resonemanget bakom att hålla de två isär.
+- Validering-före-spara kopplades in i `PackEditorPage.razor` (`Validator.
+  ValidateAsync` fanns redan färdigbyggd men anropades aldrig från något
+  UI innan den här omgången, trots att `PackDraftStore.cs`s egen kommentar
+  var uttrycklig om att UI:t skulle göra det).
+- En handfull pre-existerande smärre buggar hittades och fixades i samma
+  veva (en trasig `var(--color-danger, ...)`-referens duplicerad på fem
+  ställen, `.field-note`-CSS duplicerad identiskt i fem filer) — inget av
+  det var en avsikt med uppdraget, bara sånt som blev synligt i samma
+  filer som redan redigerades.
+
+Samma "ingen kompilator tillgänglig"-begränsning som resten av det här
+dokumentet beskriver gällde även den här omgången — se nästa avsnitt.
+
 ## Läs det här avsnittet först
 
 Den här lösningen är **skriven för hand, fil för fil, men aldrig kompilerad**.
@@ -224,10 +265,14 @@ Se `ICredentialStore.cs` för resonemanget i sin helhet.
   splash/ikon-resurserna automatiskt från `MauiIcon`/`MauiSplashScreen`-
   posterna i `.csproj`, så det behövdes inte, men värt att veta att mappen
   är tom med flit, inte av misstag.
-- App-ikonen är hela den fyrkantiga loggan (med "Playtyper"-texten) rakt av
-  — ser bra ut i appen, men en beskuren version med bara maskoten skulle bli
-  tydligare i de riktigt små ikonstorlekarna (hemskärm). Byt gärna ut
-  `Resources/AppIcon/appicon.png` mot en beskuren variant senare.
+- ~~App-ikonen är hela den fyrkantiga loggan (med "Playtyper"-texten) rakt
+  av~~ — åtgärdat i logotyp-omstylingen (2026-07-18): `Resources/AppIcon/
+  appicon.png` samt `wwwroot/favicon.png`/`icons/icon-*.png` (Web) är nu
+  en beskuren variant med bara maskoten (näbbdjuret i play-triangeln),
+  centrerad och kvadratisk, tydlig även i de riktigt små ikonstorlekarna.
+  Den fulla loggan (med "Playtyper"-texten) används fortfarande där det
+  finns gott om plats — anslutningssidan, "Mina appar"-headern, toppen av
+  sidopanelen (se `.brand-mark`-klasserna i `app.css`).
 
 ## Tre saker att verifiera tidigt (från strategifasen, fortfarande relevanta)
 
@@ -241,6 +286,9 @@ Se `ICredentialStore.cs` för resonemanget i sin helhet.
 
 ## Namngivning
 
-Repo/produktnamn: **Playtyper**. Loggan som bifogades användes rakt av för
-favicon (Web) och app-ikon (App) — se avsnittet ovan om att en beskuren
-variant vore snyggare för de små ikonstorlekarna.
+Repo/produktnamn: **Playtyper**. Den ursprungliga loggan (en enkel grön
+"P"-ikon) byttes 2026-07-18 mot den nya kopparfärgade näbbdjurs-logotypen —
+se avsnittet högst upp i det här dokumentet för hela omgången. Favicon och
+app-ikon (Web/App) använder sedan dess en beskuren, textfri variant av
+samma logotyp; den fulla varianten (med "Playtyper"-texten) används där det
+finns gott om plats — se `.brand-mark`-klasserna i `app.css`.

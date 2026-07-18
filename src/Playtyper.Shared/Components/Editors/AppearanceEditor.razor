@@ -3,6 +3,7 @@
    är strukturerad, snarare än vad den innehåller. *@
 
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["appearance"].Summary</p>
 
     <h3>Typografi</h3>
     <label class="toggle-row">
@@ -94,12 +95,12 @@
                         <option value="@cat.Id">@cat.Emoji @cat.LabelKey</option>
                     }
                 </select>
-                <select @bind="catLayout.LayoutMode" @bind:after="Notify" style="width:120px">
-                    <option value="card">card</option>
-                    <option value="list">list</option>
-                    <option value="mosaic">mosaic</option>
-                    <option value="timeline">timeline</option>
-                    <option value="table">table</option>
+                <select @bind="catLayout.LayoutMode" @bind:after="Notify" style="width:160px">
+                    <option value="card">Kort</option>
+                    <option value="list">Lista</option>
+                    <option value="mosaic">Mosaik</option>
+                    <option value="timeline">Tidslinje</option>
+                    <option value="table">Tabell</option>
                 </select>
                 <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Remove(catLayout); Notify(); }">✕</button>
             </div>
@@ -107,46 +108,50 @@
     </div>
     <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Add(new CategoryLayoutConfig()); Notify(); }">+ Kategorilayout</button>
 
-    <h3 style="margin-top:28px">Struktur (Ui)</h3>
+    <h3 style="margin-top:28px">Sidhuvud, kort &amp; layout</h3>
     <label class="toggle-row">
         <input type="checkbox" checked="@(Draft.Config.Ui != null)" @onchange="ToggleUi" />
-        Anpassa header/kort/rutnät-stil (annars används standardvärdena)
+        Anpassa hur sidhuvud, kort och rutnät ser ut (annars används standardvärdena)
     </label>
     @if (Draft.Config.Ui is { } ui)
     {
         <div class="field-grid" style="margin-top:8px">
             <div>
-                <label>Header-stil</label>
+                <label>Sidhuvudets stil</label>
                 <select @bind="ui.HeaderStyle" @bind:after="Notify">
-                    <option value="surface">surface</option>
-                    <option value="transparent">transparent</option>
-                    <option value="solid">solid</option>
+                    @foreach (var option in HelpText.HeaderStyleOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
+                <p class="field-note" style="margin-top:4px">
+                    @(HelpText.HeaderStyleOptions.FirstOrDefault(o => o.Value == ui.HeaderStyle)?.Description)
+                </p>
             </div>
             <div>
                 <label>Kort-stil</label>
                 <input @bind="ui.CardStyle" @bind:event="oninput" @bind:after="Notify" placeholder="default" />
             </div>
             <div>
-                <label>Rutnäts-stil</label>
+                <label>Rutnäts-stil <span class="field-note">(hur korten placeras i listan)</span></label>
                 <select @bind="ui.GridStyle" @bind:after="Notify">
-                    <option value="single">single</option>
-                    <option value="masonry">masonry</option>
+                    <option value="single">Enkel rad — alla kort lika breda</option>
+                    <option value="masonry">Mosaik — olika höjd, tätt packat som Pinterest</option>
                 </select>
             </div>
             <div>
-                <label>Detaljvy-stil</label>
+                <label>Detaljvy-stil <span class="field-note">(hur en aktivitet öppnas)</span></label>
                 <select @bind="ui.DetailStyle" @bind:after="Notify">
-                    <option value="sheet">sheet</option>
-                    <option value="page">page</option>
+                    <option value="sheet">Panel som glider upp underifrån</option>
+                    <option value="page">Egen sida, hela skärmen</option>
                 </select>
             </div>
             <div>
-                <label>Densitet (listvy)</label>
+                <label>Densitet (listvy) <span class="field-note">(hur tätt raderna packas)</span></label>
                 <select @bind="ui.Density" @bind:after="Notify">
-                    <option value="comfortable">comfortable (~64px)</option>
-                    <option value="compact">compact (~44px)</option>
-                    <option value="minimal">minimal (~34px)</option>
+                    <option value="comfortable">Luftig — bäst läsbarhet (~64px per rad)</option>
+                    <option value="compact">Kompakt — fler rader synliga (~44px)</option>
+                    <option value="minimal">Minimal — så mycket som möjligt på skärmen (~34px)</option>
                 </select>
             </div>
             <div>
@@ -158,20 +163,20 @@
                 </select>
             </div>
             <div>
-                <label>Startskärm</label>
+                <label>Startskärm <span class="field-note">(bara relevant om Startskärm är "dashboard" i Innehåll-fliken)</span></label>
                 <select @bind="ui.HomeLayout" @bind:after="Notify">
-                    <option value="feed">feed (flöde + ev. Redo nu)</option>
-                    <option value="dashboard">dashboard (snabbåtgärder + kategorikakel)</option>
+                    <option value="feed">Flöde — en löpande lista av aktiviteter</option>
+                    <option value="dashboard">Översikt — snabbknappar och kategori-kakel</option>
                 </select>
             </div>
         </div>
-        <label class="field-note" style="display:block;margin-top:10px">Vyer i vyväxlaren <span class="field-note">(tom = card + list, standard)</span></label>
+        <label class="field-note" style="display:block;margin-top:10px">Vilka vyer besökaren kan växla mellan <span class="field-note">(lämna alla avbockade så används standard: kort + lista)</span></label>
         <div class="layout-checks">
             @foreach (var mode in new[] { "card", "list", "mosaic" })
             {
                 <label class="toggle-row">
                     <input type="checkbox" checked="@((ui.AvailableLayouts ?? new()).Contains(mode))" @onchange="e => ToggleLayoutMode(ui, mode, e.Value is bool b && b)" />
-                    @mode
+                    @(mode switch { "card" => "Kort", "list" => "Lista", "mosaic" => "Mosaik", _ => mode })
                 </label>
             }
         </div>
@@ -183,7 +188,6 @@
     .editor-pane--wide { max-width: 860px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
     .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
-    .field-note { color: var(--color-text-muted); font-size: 12px; }
     .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
     .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
     .stack-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }

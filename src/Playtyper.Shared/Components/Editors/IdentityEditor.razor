@@ -3,7 +3,7 @@
 
 <div class="editor-pane">
     <h3>Identitet</h3>
-    <p style="color:var(--color-text-secondary)">Grundläggande information om @Draft.PackId.</p>
+    <p class="help-text">@HelpText.Tabs["identity"].Summary Det här gäller <strong>@Draft.PackId</strong>.</p>
 
     <div class="field-grid">
         <div>
@@ -15,7 +15,7 @@
             <input @bind="Draft.Config.Emoji" @bind:event="oninput" @bind:after="Notify" style="max-width:80px" />
         </div>
         <div style="grid-column:1/-1">
-            <label>Tagline</label>
+            <label>Tagline <span class="field-hint">(en kort undertext, visas ofta nära namnet)</span></label>
             <input @bind="Draft.Config.Tagline" @bind:event="oninput" @bind:after="Notify" />
         </div>
         <div>
@@ -28,26 +28,37 @@
         </div>
     </div>
 
-    <h3 style="margin-top:24px">Panic-knapp</h3>
+    <h3 style="margin-top:24px">Panic-knapp <span class="tab-badge">valfritt</span></h3>
+    <p class="help-text">
+        En alltid-synlig genvägsknapp för akuta situationer — trycker besökaren på den hoppar appen direkt till en förenklad vy, utan att behöva leta.
+        <details class="info-note">
+            <summary>?</summary>
+            <span class="info-note__body">Tänkt för appar där besökaren kan behöva snabb hjälp mitt i en stressad stund — knappen finns kvar synlig oavsett var i appen man är, och tar en direkt till det viktigaste. Helt valfritt: lämna den bara med sitt förvalda utseende om appen inte behöver den här typen av genväg.</span>
+        </details>
+    </p>
     <div class="field-grid">
         <div>
-            <label>Etikett</label>
+            <label>
+                Etikett <span class="field-hint">(texten på knappen)</span>
+                <details class="info-note">
+                    <summary>?</summary>
+                    <span class="info-note__body">@HelpText.TranslationKeyExplanation</span>
+                </details>
+            </label>
             <input @bind="Draft.Config.PanicButton.LabelKey" @bind:event="oninput" @bind:after="Notify" />
         </div>
         <div>
             <label>Stil</label>
             <select @bind="Draft.Config.PanicButton.Style" @bind:after="Notify">
-                <option value="calm">calm</option>
-                <option value="urgent">urgent</option>
+                <option value="calm">Lugn — mjuk, diskret färg</option>
+                <option value="urgent">Uppmärksamhetsväckande — stark, tydlig färg</option>
             </select>
         </div>
     </div>
 
     <h3 style="margin-top:24px">Språk</h3>
-    <p style="color:var(--color-text-secondary);font-size:13px">
-        Utöver Standardspråk ovan — vilka språk som visas i språkväljaren. LanguageService
-        upptäcker även översättningsfiler som saknas här (v2-packs), så listan behöver inte
-        vara uttömmande, men en synlig flagga/etikett kräver en rad.
+    <p class="help-text">
+        De språk som visas i appens språkväljare, utöver Standardspråk ovan. Du behöver bara lägga till en rad här om du vill att besökaren ska kunna VÄLJA det språket manuellt — appen upptäcker automatiskt vilka översättningar som faktiskt finns, så listan behöver inte vara fullständig.
     </p>
     <div class="chip-list">
         @foreach (var lang in Draft.Config.Languages)
@@ -64,16 +75,25 @@
 
     <h3 style="margin-top:24px">Startvy &amp; egen CSS</h3>
     <div class="field-grid">
-        <div>
-            <label>Startvy</label>
+        <div style="grid-column:1/-1">
+            <label>Vad besökaren ser först när appen öppnas</label>
             <select @bind="Draft.Config.StartView" @bind:after="Notify">
-                <option value="grid">grid</option>
-                <option value="panic">panic</option>
-                <option value="welcome">welcome</option>
+                @foreach (var option in HelpText.StartViewOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
             </select>
+            <p class="help-text help-text--tight">
+                @(HelpText.StartViewOptions.FirstOrDefault(o => o.Value == Draft.Config.StartView)?.Description ?? "Bestämmer vilken skärm besökaren möter direkt när appen öppnas.")
+            </p>
         </div>
         <div style="grid-column:1/-1">
-            <label>Egen CSS <span style="color:var(--color-text-muted)">(valfritt, läggs till sist — kan skriva över tokens)</span></label>
+            <label>
+                Egen CSS <span class="tab-badge tab-badge--muted">för den tekniskt kunniga</span>
+            </label>
+            <p class="help-text help-text--tight">
+                Valfritt. Om du kan CSS kan du klistra in egen kod här för finjusteringar utöver det de andra flikarna erbjuder. Läggs till sist, vilket betyder att den kan skriva över färgvalen du gjort på Utseende-fliken — lämna tomt om du är osäker.
+            </p>
             <textarea rows="5" style="font-family:monospace;font-size:12px" value="@Draft.Config.CustomCss" @onchange="e => { Draft.Config.CustomCss = e.Value?.ToString(); Notify(); }"></textarea>
         </div>
     </div>

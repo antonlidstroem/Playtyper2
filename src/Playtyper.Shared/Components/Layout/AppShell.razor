@@ -5,19 +5,25 @@
 <div class="app-shell">
     <div class="pack-topbar">
         <div class="pack-topbar__crumbs">
-            <span class="pack-topbar__brand">Playtyper</span>
+            <img src="_content/Playtyper.Shared/img/logo.png" alt="Playtyper" class="brand-mark brand-mark--sm" />
             <span class="pack-topbar__sep">/</span>
             <span>@RepoName</span>
             <span class="pack-topbar__sep">/</span>
             <span>@Title</span>
         </div>
         <div class="pack-topbar__actions">
+            <button class="ghost pack-topbar__theme-toggle" @onclick="ToggleTheme"
+                    title="@(_isDark ? "Byt till ljust läge" : "Byt till mörkt läge")"
+                    aria-label="@(_isDark ? "Byt till ljust läge" : "Byt till mörkt läge")">
+                @(_isDark ? "☀️" : "🌙")
+            </button>
             @if (IsDirty)
             {
-                <span class="badge badge-warning">Osparat</span>
+                <span class="badge badge-warning" title="Du har ändringar som bara finns på den här enheten än — de skickas till GitHub först när du trycker Spara.">Osparat</span>
             }
-            <button class="ghost pack-topbar__action-label" @onclick="OnShowDiff">Visa ändringar</button>
-            <button class="primary pack-topbar__action-label" @onclick="OnSave" disabled="@(!IsDirty || Saving)">
+            <button class="ghost pack-topbar__action-label" @onclick="OnShowDiff" title="Se exakt vilka rader som ändrats sedan senaste sparningen">Visa ändringar</button>
+            <button class="primary pack-topbar__action-label" @onclick="OnSave" disabled="@(!IsDirty || Saving)"
+                    title="Skickar dina ändringar till GitHub, så att appen kan byggas om med det nya innehållet">
                 @if (Saving) { <span class="spinner"></span> } else { <text>Spara till GitHub</text> }
             </button>
         </div>
@@ -28,7 +34,7 @@
             @foreach (var tab in Tabs)
             {
                 <button class="nav-item @(tab.Id == ActiveTab ? "nav-item--active" : "")"
-                        @onclick="() => OnTabChanged.InvokeAsync(tab.Id)" title="@tab.Label">
+                        @onclick="() => OnTabChanged.InvokeAsync(tab.Id)" title="@(tab.Hint ?? tab.Label)">
                     <span class="nav-icon">@tab.Icon</span>
                     <span class="nav-label">@tab.Label</span>
                 </button>
@@ -59,7 +65,7 @@
         @foreach (var tab in Tabs)
         {
             <button class="bottom-nav-item @(tab.Id == ActiveTab ? "bottom-nav-item--active" : "")"
-                    @onclick="() => OnTabChanged.InvokeAsync(tab.Id)">
+                    @onclick="() => OnTabChanged.InvokeAsync(tab.Id)" aria-label="@(tab.Hint ?? tab.Label)">
                 <span class="nav-icon">@tab.Icon</span>
                 <span>@tab.Label</span>
             </button>
@@ -81,10 +87,10 @@
         background: var(--color-surface-1); flex-shrink: 0; gap: 8px; flex-wrap: wrap;
     }
     .pack-topbar__crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); min-width: 0; }
-    .pack-topbar__brand { font-weight: 600; color: var(--color-text-primary); }
     .pack-topbar__sep { opacity: .5; }
     .pack-topbar__actions { display: flex; align-items: center; gap: 8px; }
     .pack-topbar__action-label { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
+    .pack-topbar__theme-toggle { padding: 6px 9px; font-size: 15px; line-height: 1; }
 
     .app-shell__nav-sidebar { flex-direction: column; padding: 10px 6px; border-right: 1px solid var(--color-border); background: var(--color-surface-1); gap: 2px; overflow-y: auto; }
     .nav-item {
@@ -153,9 +159,12 @@
 </style>
 
 @code {
-    public sealed record TabInfo(string Id, string Label, string Icon);
+    public sealed record TabInfo(string Id, string Label, string Icon, string? Hint = null);
 
     private bool _mobilePreviewOpen;
+    private bool _isDark = true; // matchar CSS-fallback/theme-boot.js-standarden; korrigeras i OnInitializedAsync
+
+    [Inject] private Microsoft.JSInterop.IJSRuntime Js { get; set; } = default!;
 
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string RepoName { get; set; } = "";
@@ -168,4 +177,26 @@
     [Parameter] public EventCallback<string> OnTabChanged { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? PreviewContent { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // theme-boot.js (en inline <script> i <head>, se index.html) har
+        // redan satt data-theme på <html> innan Blazor ens bootade — vi
+        // läser bara av vad den redan bestämt, sätter inget här. Om anropet
+        // av någon anledning misslyckas (t.ex. prerendering utan JS) behåller
+        // vi _isDark = true (fältets startvärde), samma antagande som
+        // CSS-fallbacken gör om theme-boot.js aldrig körts.
+        try
+        {
+            var theme = await Js.InvokeAsync<string>("playtyperInterop.getTheme");
+            _isDark = theme == "dark";
+        }
+        catch { /* se kommentar ovan — behåll startvärdet */ }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _isDark = !_isDark;
+        await Js.InvokeVoidAsync("playtyperInterop.setTheme", _isDark ? "dark" : "light");
+    }
 }

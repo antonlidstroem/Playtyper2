@@ -19,7 +19,7 @@ else if (_loadError != null)
 else if (_draft != null)
 {
     <AppShell Title="@_draft.PackId" RepoName="@(State.Repo?.OwnerRepo ?? "")"
-              IsDirty="@_isDirty" Saving="@_saving"
+              IsDirty="@_isDirty" Saving="@(_saving || _validating)"
               OnSave="SaveAsync" OnShowDiff="() => _showDiff = true"
               Tabs="_tabs" ActiveTab="@_activeTab" OnTabChanged="tab => _activeTab = tab">
         <ChildContent>
@@ -87,7 +87,59 @@ else if (_draft != null)
             </div>
         </div>
     }
+
+    @if (_pendingValidation is { } validation)
+    {
+        <div class="modal-backdrop" @onclick="() => _pendingValidation = null">
+            <div class="modal card modal--wide" @onclick:stopPropagation="true">
+                @if (validation.Errors.Count > 0)
+                {
+                    <h3>Vi hittade några problem</h3>
+                    <p class="help-text">
+                        Innan du sparar: det här är saker som troligen gör att appen inte fungerar som tänkt, eller inte går att bygga alls. Du kan fortfarande spara ändå, men vi rekommenderar att du rättar dem först.
+                    </p>
+                    <ul class="validation-list validation-list--errors">
+                        @foreach (var error in validation.Errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <h3>Innan du sparar</h3>
+                    <p class="help-text">
+                        Inget här hindrar dig från att spara — men det är värt att kika på innan du fortsätter.
+                    </p>
+                }
+
+                @if (validation.Warnings.Count > 0)
+                {
+                    <ul class="validation-list validation-list--warnings">
+                        @foreach (var warning in validation.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                }
+
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button @onclick="() => _pendingValidation = null">Gå tillbaka och rätta</button>
+                    <button class="@(validation.Errors.Count > 0 ? "danger" : "primary")" @onclick="DoCommitAsync">
+                        @(validation.Errors.Count > 0 ? "Spara ändå" : "Spara")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 }
+
+<style>
+    .validation-list { margin: 4px 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.6; }
+    .validation-list--errors { color: var(--color-danger-text); }
+    .validation-list--warnings { color: var(--color-warning-text); }
+    .validation-list + .validation-list { margin-top: 10px; }
+</style>
 
 @code {
     [Parameter] public string PackId { get; set; } = "";
@@ -100,21 +152,24 @@ else if (_draft != null)
     private string _activeTab = "identity";
     private bool _showDiff;
 
+    private Validator.ValidationResult? _pendingValidation;
+    private bool _validating;
+
     private bool _recoveredDraftPrompt;
     private DateTimeOffset? _recoveredAt;
     private string? _recoveredJson;
 
     private readonly List<AppShell.TabInfo> _tabs = new()
     {
-        new("identity",    "Identitet",         "🪪"),
-        new("tokens",      "Tokens",            "🎨"),
-        new("activities",  "Aktiviteter",       "📋"),
-        new("content",     "Innehåll",          "🗂️"),
-        new("situations",  "Läge & genvägar",   "⚡"),
-        new("onboarding",  "Introduktion",      "👋"),
-        new("appearance",  "Utseende",          "🖌️"),
-        new("backends",    "Backend & inloggning", "🔌"),
-        new("advanced",    "Avancerat",         "{ }"),
+        new("identity",    "Identitet",         "🪪", HelpText.Tabs["identity"].Summary),
+        new("tokens",      "Färger",            "🎨", HelpText.Tabs["tokens"].Summary),
+        new("activities",  "Aktiviteter",       "📋", HelpText.Tabs["activities"].Summary),
+        new("content",     "Innehåll",          "🗂️", HelpText.Tabs["content"].Summary),
+        new("situations",  "Läge & genvägar",   "⚡", HelpText.Tabs["situations"].Summary),
+        new("onboarding",  "Introduktion",      "👋", HelpText.Tabs["onboarding"].Summary),
+        new("appearance",  "Utseende",          "🖌️", HelpText.Tabs["appearance"].Summary),
+        new("backends",    "Backend & inloggning", "🔌", HelpText.Tabs["backends"].Summary),
+        new("advanced",    "Avancerat",         "{ }", HelpText.Tabs["advanced"].Summary),
     };
 
     protected override async Task OnInitializedAsync()
@@ -167,6 +222,42 @@ else if (_draft != null)
     private async Task SaveAsync()
     {
         if (_draft == null || State.Repo == null) return;
+
+        // Validator.ValidateAsync läser alltid mot vad som FAKTISKT ligger på
+        // GitHub just nu (den kan inte se innehållet i _draft — det finns
+        // ingen lokal-draft-variant av metoden) — den fångar alltså inte fel
+        // i ändringarna du är på väg att spara, men den fångar om baslinjen
+        // du bygger vidare på redan är trasig (t.ex. efter ett tidigare
+        // avbrutet delvis-commit). Se PackDraftStore.cs:s klassdoc-kommentar
+        // ("kontroll innan skrivning") för avsikten bakom detta.
+        _validating = true;
+        StateHasChanged();
+        var validation = await Validator.ValidateAsync(State.Repo, PackId);
+        _validating = false;
+
+        if (!validation.IsValid || validation.Warnings.Count > 0)
+        {
+            // Stanna upp och visa vad Validator hittade — men tvinga inte
+            // fram en åtgärd här och nu; PackDraftStore.CommitAsync:s egen
+            // kommentar är uttrycklig om att UI:t ska "låta användaren
+            // bekräfta även vid varningar" snarare än blockera helt.
+            _pendingValidation = validation;
+            StateHasChanged();
+            return;
+        }
+
+        await DoCommitAsync();
+    }
+
+    /// <summary>
+    /// Den faktiska commit-logiken, utbruten ur SaveAsync så den kan
+    /// anropas antingen direkt (validering var ren) eller efter att
+    /// personen tryckt "Spara ändå" i valideringsmodalen.
+    /// </summary>
+    private async Task DoCommitAsync()
+    {
+        if (_draft == null || State.Repo == null) return;
+        _pendingValidation = null;
         _saving = true;
         StateHasChanged();
 

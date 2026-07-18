@@ -3,29 +3,61 @@
    Playtypus.Core/wwwroot/css/*.css — bygger man samma produktfamilj ska
    de dela skala, inte uppfinna en egen. Mobile-first (min-width), inte
    max-width — samma konvention som resten av kodbasen.
+
+   ── Färgpalett (2026-07-18, logotyp-omstyling) ──────────────────────────
+   Hela paletten är härledd direkt ur den nya Playtyper-logotypen (näbbdjur
+   i koppar-metallrelief på svart) via faktisk pixelsampling av bilden, inte
+   uppskattat för hand — se koppar-rampen nedan, tio band från logotypens
+   mörkaste skugga (#120803) till ljusaste höjdpunkt (#f6af7b). Bara två
+   av bandens värden används rakt av (mörkt lägets accent, ljust lägets
+   accent lätt mörkad för kontrast mot ljus botten) — resten av varje tema
+   är byggt kring de värdena, inte bara en gradient rakt av, så att kort,
+   ytor och text fortfarande läses tydligt.
+
+   Alla par nedan är kontrollerade mot WCAG 2.1 AA (≥4.5:1 för normal text,
+   ≥3:1 för stora/UI-element) med samma formel som Services/ContrastChecker.cs
+   använder på pack-temats egna färger — samma standard Playtyper redan
+   ber KUNDERNAS teman hålla sig till, så det vore fel att inte hålla
+   samma mått på sitt eget gränssnitt.
 */
 
 :root {
-  --color-bg:            #faf9f7;
+  /* Ljust läge: varm pergament/gräddbotten, inte ett rent vitt — ekar
+     loggans värme utan att bara vara det mörka läget inverterat. */
+  --color-bg:            #faf6f0;
   --color-surface-1:     #ffffff;
-  --color-surface-2:     #f2f0ec;
-  --color-border:        #ddd8d0;
-  --color-border-strong: #b8b2a6;
+  --color-surface-2:     #f2e9dd;
+  --color-border:        #e6d8c5;
+  --color-border-strong: #c9b49a;
 
-  --color-text-primary:   #201e1a;
-  --color-text-secondary: #5c574d;
-  --color-text-muted:     #8a8478;
+  --color-text-primary:   #241a10;
+  --color-text-secondary: #5c4a38;
+  --color-text-muted:     #8a765f;
 
-  --color-accent:      #2f6f4f;
-  --color-accent-text: #ffffff;
-  --color-accent-soft: #e4efe8;
+  --color-accent:      #9c4a1c;
+  --color-accent-text: #fff8f2;
+  --color-accent-soft: #f4e3d3;
 
-  --color-success-bg:   #e4f3e6;
-  --color-success-text: #256b35;
-  --color-warning-bg:   #fbf0dd;
+  --color-success-bg:   #e3f0e2;
+  --color-success-text: #2b6b34;
+  --color-warning-bg:   #faecd2;
   --color-warning-text: #8a5a12;
-  --color-danger-bg:    #fbe6e4;
+  --color-danger-bg:    #fae3df;
   --color-danger-text:  #a3352a;
+  --color-danger-solid-text: #fff8f7;
+
+  /* Kopparrampen (för gradienter/glöd, signaturdetaljen — se .brand-mark,
+     .copper-sweep nedan). Samma tio band som faktiskt finns i logotypen. */
+  --copper-1: #120803;
+  --copper-2: #291004;
+  --copper-3: #4e2107;
+  --copper-4: #662e12;
+  --copper-5: #803c19;
+  --copper-6: #9f4d22;
+  --copper-7: #b26335;
+  --copper-8: #cf7943;
+  --copper-9: #e8925c;
+  --copper-10: #f6af7b;
 
   --radius-sm: 6px;
   --radius:    10px;
@@ -39,19 +71,28 @@
 }
 
 [data-theme="dark"] {
-  --color-bg:            #171613;
-  --color-surface-1:     #201e1a;
-  --color-surface-2:     #2a2822;
-  --color-border:        #3a372e;
-  --color-border-strong: #524e40;
+  /* Mörkt läge är förvalet i praktiken: playtyperInterop.applyStoredTheme
+     (interop.js), körd innan Blazor bootar, sätter data-theme på <html>
+     utifrån ett sparat val eller — första besöket — systemets
+     prefers-color-scheme. Se AppShell.razor för den manuella växlaren.
+     Båda lägena är fullt genomarbetade här, inget är "det egentliga"
+     temat med det andra som eftertanke. Basen är en varm nästan-svart,
+     inte ett rent #000 (som logotypens egen bakgrund är) — skonsammare
+     mot ögonen vid långa redigeringspass, och skiljer ytor (surface-1/2)
+     tydligare än ett rent svart underlag hade tillåtit. */
+  --color-bg:            #171310;
+  --color-surface-1:     #211b16;
+  --color-surface-2:     #2b241d;
+  --color-border:        #3d332a;
+  --color-border-strong: #574a3c;
 
-  --color-text-primary:   #f3f1ec;
-  --color-text-secondary: #b8b2a6;
-  --color-text-muted:     #857f72;
+  --color-text-primary:   #f5ede3;
+  --color-text-secondary: #c9b8a6;
+  --color-text-muted:     #93816e;
 
-  --color-accent:      #5aa97f;
-  --color-accent-text: #0d1b13;
-  --color-accent-soft: #1e2e24;
+  --color-accent:      #e0925c;
+  --color-accent-text: #241505;
+  --color-accent-soft: #3a2a1c;
 
   --color-success-bg:   #1c3320;
   --color-success-text: #7cd393;
@@ -59,6 +100,18 @@
   --color-warning-text: #e3b262;
   --color-danger-bg:    #3a1e1a;
   --color-danger-text:  #f0968a;
+  --color-danger-solid-text: #2b0f0a;
+
+  --copper-1: #120803;
+  --copper-2: #291004;
+  --copper-3: #4e2107;
+  --copper-4: #662e12;
+  --copper-5: #803c19;
+  --copper-6: #9f4d22;
+  --copper-7: #b26335;
+  --copper-8: #cf7943;
+  --copper-9: #e8925c;
+  --copper-10: #f6af7b;
 }
 
 * { box-sizing: border-box; }
@@ -89,6 +142,16 @@ p { margin: 0 0 8px; }
 
 a { color: var(--color-accent); }
 
+/* Kopparfärgad fokusring överallt istället för webbläsarens standardblå —
+   en av de många små platser där ett omstylat gränssnitt annars förråder
+   sig genom att en enda kvarglömd blå ram inte hör hemma i paletten.
+   :focus-visible (inte :focus) så musklick fortfarande är tyst, bara
+   tangentbordsnavigering visar ringen. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 
 button {
@@ -97,18 +160,22 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 8px 14px;
-  transition: background-color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
 }
 button:hover { background: var(--color-surface-2); }
-button:disabled { opacity: .5; cursor: not-allowed; }
+button:active { transform: scale(.98); }
+button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 button.primary {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--copper-6));
   color: var(--color-accent-text);
   border-color: transparent;
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }
 button.primary:hover { filter: brightness(1.08); }
 button.danger { color: var(--color-danger-text); border-color: var(--color-danger-text); }
+button.danger-solid { background: var(--color-danger-text); color: var(--color-danger-solid-text); border-color: transparent; font-weight: 600; }
+button.danger-solid:hover { filter: brightness(1.08); }
 button.ghost { background: transparent; border-color: transparent; }
 button.ghost:hover { background: var(--color-surface-2); }
 
@@ -118,11 +185,68 @@ input[type="text"], input[type="color"], input[type="number"], input:not([type])
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   width: 100%;
+  transition: border-color 120ms ease;
 }
+input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--color-accent); }
 textarea { font-family: var(--font-mono); font-size: 13px; resize: vertical; }
 input[type="color"] { padding: 2px; height: 34px; cursor: pointer; }
 
 label { display: block; font-size: 13px; color: var(--color-text-secondary); margin-bottom: 4px; }
+
+/* En kort förklaringsrad under en flik-/sektionsrubrik eller ett krångligt
+   fält — det nya pedagogiska lagrets huvudbyggsten (se HelpText.cs).
+   Egen klass snarare än att återanvända .section-hint överallt, så
+   platser som medvetet vill vara kortfattade kan förbli det. */
+.help-text {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 2px 0 12px;
+  max-width: 62ch;
+}
+.help-text--tight { margin-bottom: 6px; }
+
+/* Litet, tyst infomärke att sätta bredvid en etikett för fördjupning som
+   inte behöver ta plats som brödtext hela tiden — en <details> inuti,
+   inte en JS-driven tooltip, så den fungerar utan JS-interop och är
+   tangentbords-/skärmläsarvänlig utan extra ARIA-käkning. */
+.info-note { display: inline-block; margin-left: 4px; }
+.info-note > summary {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--color-surface-2); color: var(--color-text-muted);
+  font-size: 11px; font-weight: 700; cursor: pointer; list-style: none;
+  vertical-align: middle;
+}
+.info-note > summary::-webkit-details-marker { display: none; }
+.info-note > summary:hover { background: var(--color-accent-soft); color: var(--color-accent); }
+.info-note[open] > summary { background: var(--color-accent-soft); color: var(--color-accent); }
+.info-note__body {
+  display: block; margin-top: 6px; padding: 8px 10px;
+  background: var(--color-surface-2); border-radius: var(--radius-sm);
+  font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.5;
+  max-width: 48ch;
+}
+
+/* En liten, tystare förklaringsrad under ett fält — t.ex. varför en
+   GitHub-rättighet behövs, eller vad ett tekniskt ord betyder. Fanns
+   tidigare identiskt duplicerad i fem olika .razor-filer (det här
+   projektet har ingen Blazor CSS-isolering, så varje komponent som
+   ville ha klassen skrev den lokalt igen) — samlad här 2026-07-18 så
+   nya ställen som behöver den inte behöver komma ihåg att duplicera den
+   på nytt, och så den garanterat finns oavsett vilken sida som laddas
+   först (ConnectRepoPage, som laddas FÖRE någon editor-komponent, är
+   ett konkret exempel på varför ordningen annars kan strula). */
+.field-note { color: var(--color-text-muted); font-size: 12px; }
+
+.field-hint { font-weight: 400; color: var(--color-text-muted); font-size: 12px; }
+
+.tab-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; margin-left: 8px;
+    background: var(--color-accent-soft); color: var(--color-accent); vertical-align: middle;
+}
+.tab-badge--muted { background: var(--color-surface-2); color: var(--color-text-muted); }
 
 .badge {
   display: inline-block;
@@ -141,6 +265,7 @@ label { display: block; font-size: 13px; color: var(--color-text-secondary); mar
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 14px;
+  box-shadow: 0 1px 3px rgba(30, 15, 5, .06);
 }
 
 /* 2026-07-13: promoted from IdentityEditor.razor's local <style> block,
@@ -181,7 +306,6 @@ label { display: block; font-size: 13px; color: var(--color-text-secondary); mar
    styling så fort MyAppsPage inte råkade vara monterad samtidigt. */
 .apps-page { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
 .apps-page__header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
-.apps-page__logo { height: 40px; }
 .apps-page__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .apps-page__card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
@@ -192,6 +316,7 @@ label { display: block; font-size: 13px; color: var(--color-text-secondary); mar
 .apps-page__error { color: var(--color-danger-text); font-size: 13px; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
 .modal { max-width: 420px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal--wide { max-width: 520px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
@@ -219,3 +344,31 @@ label { display: block; font-size: 13px; color: var(--color-text-secondary); mar
   .app-shell__nav-sidebar .nav-label { display: inline; }
   .app-shell__preview-panel { display: flex; width: 340px; flex-shrink: 0; }
 }
+
+/* ── Signaturdetalj: "kopparsvepet" ──────────────────────────────────────
+   Lånar det enda riktigt distinkta grafiska draget i logotypen — de
+   parallella, svepande linjerna över näbbdjurets rygg som antyder
+   rörelse genom vatten — som en återanvändbar, MYCKET sparsam textur.
+   Används på precis två ställen (aktiv-flik-indikatorn i AppShell och
+   toppen av .connect-page__card), aldrig som allmän bakgrundsdekor —
+   se frontend-design-riktlinjen om att spendera sin "djärvhet" på ett
+   ställe istället för att strö ut den. Ren CSS-gradient, ingen bildfil,
+   så den ärver temats färger automatiskt i både ljust och mörkt läge. */
+.copper-sweep {
+  background:
+    repeating-linear-gradient(
+      100deg,
+      transparent 0px, transparent 18px,
+      var(--color-accent) 18px, var(--color-accent) 19.5px,
+      transparent 19.5px, transparent 34px
+    );
+  opacity: .12;
+}
+[data-theme="dark"] .copper-sweep { opacity: .16; }
+
+/* Loggan som återkommande ankare (anslutningssida, "Mina appar"-header,
+   sidopanelens topp) — en enda regel så höjd/proportion inte drivar isär
+   mellan de tre ställena den används. */
+.brand-mark { height: 40px; width: auto; display: block; }
+.brand-mark--lg { height: 56px; }
+.brand-mark--sm { height: 28px; }

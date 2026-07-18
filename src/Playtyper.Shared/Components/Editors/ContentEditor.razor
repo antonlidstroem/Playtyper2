@@ -1,5 +1,8 @@
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["content"].Summary</p>
+
     <h3>Kategorier</h3>
+    <p class="help-text help-text--tight">De grupper besökaren kan sortera eller filtrera innehållet efter, till exempel "Inomhus" eller "Utomhus".</p>
     <div class="chip-list">
         @foreach (var cat in Draft.Config.Categories)
         {
@@ -14,16 +17,17 @@
     <button class="ghost" @onclick="AddCategory">+ Kategori</button>
 
     <h3 style="margin-top:24px">Filter</h3>
+    <p class="help-text help-text--tight">Sökknappar besökaren kan använda för att snabbt hitta rätt bland aktiviteterna.</p>
     <div class="chip-list">
         @foreach (var filter in Draft.Config.Filters)
         {
             <div class="card" style="padding:10px">
                 <div style="display:flex;gap:8px;align-items:center">
                     <input value="@filter.Id" @onchange="e => { filter.Id = e.Value?.ToString() ?? filter.Id; Notify(); }" placeholder="id" style="width:110px" />
-                    <select value="@filter.Type" @onchange="e => { filter.Type = e.Value?.ToString() ?? filter.Type; Notify(); }" style="width:130px">
-                        <option value="segmented">segmented</option>
-                        <option value="multiSelect">multiSelect</option>
-                        <option value="toggle">toggle</option>
+                    <select value="@filter.Type" @onchange="e => { filter.Type = e.Value?.ToString() ?? filter.Type; Notify(); }" style="width:190px" title="Hur besökaren väljer alternativ i det här filtret">
+                        <option value="segmented">Knapprad — välj en</option>
+                        <option value="multiSelect">Kryssrutor — välj flera</option>
+                        <option value="toggle">Enkel av/på-knapp</option>
                     </select>
                     <input value="@LabelFor(filter.LabelKey)" @onchange="e => { SetLabel(filter.LabelKey, e.Value?.ToString()); Notify(); }" placeholder="Text (sv)" style="flex:1" />
                     <button class="ghost" @onclick="() => { Draft.Config.Filters.Remove(filter); Notify(); }">✕</button>
@@ -37,20 +41,35 @@
     <button class="ghost" @onclick="AddFilter">+ Filter</button>
 
     <h3 style="margin-top:24px">Funktioner</h3>
-    <p style="color:var(--color-text-secondary);font-size:13px">
-        Genererad direkt ur FeatureManifest — samma katalog som styr AI-prompten, så de här
-        aldrig kan glida isär. Fält med mer komplex struktur (streak, export, m.fl.) redigeras
-        i Avancerat tills vidare.
+    <p class="help-text help-text--tight">
+        Sätt på eller stäng av enskilda funktioner i appen. Vissa rader har en liten (?) bredvid sig med en längre förklaring — tryck på den om du är osäker på vad något gör. Fält med mer komplex struktur (streak, export, med flera) redigeras i Avancerat tills vidare.
     </p>
 
+    @* Listan renderas automatiskt ur FeatureManifest.Features via
+       FeatureFlagsReflection.AllBindings() — samma katalog som driver
+       AI-promptens systemschema (se FeatureManifest.cs), så etikett och
+       faktiskt fält aldrig kan glida isär. Den fördjupade förklaringen
+       (info-note) kommer däremot från HelpText.ForFeature, ett separat,
+       människo-riktat lager — se den filens klassdoc för varför de två
+       hålls isär istället för att slås ihop till en enda källa. *@
     @foreach (var group in FeatureFlagsReflection.AllBindings().GroupBy(b => b.Feature.Category))
     {
         <h4 style="margin-top:16px;font-size:13px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.03em">@group.Key</h4>
         <div class="feature-grid">
             @foreach (var binding in group)
             {
-                <div class="feature-row" title="@binding.Feature.What">
-                    <span class="feature-row__label">@binding.Feature.What</span>
+                var detail = HelpText.ForFeature(binding.Feature.Id);
+                <div class="feature-row">
+                    <span class="feature-row__label" title="@binding.Feature.What">
+                        @binding.Feature.What
+                        @if (detail is not null)
+                        {
+                            <details class="info-note">
+                                <summary>?</summary>
+                                <span class="info-note__body">@detail</span>
+                            </details>
+                        }
+                    </span>
                     @if (binding.Kind == FeatureKind.Bool)
                     {
                         var val = (bool)(binding.GetValue(Draft.Config.Features) ?? false);
@@ -79,10 +98,10 @@
     .chip-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
     .chip-edit { display: flex; gap: 8px; align-items: center; padding: 8px; }
     .feature-grid { display: flex; flex-direction: column; gap: 2px; }
-    .feature-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: var(--radius-sm); }
+    .feature-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: var(--radius-sm); }
     .feature-row:hover { background: var(--color-surface-2); }
-    .feature-row__label { font-size: 13px; }
-    .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+    .feature-row__label { display: inline-flex; align-items: flex-start; gap: 2px; flex-wrap: wrap; font-size: 13px; padding-top: 2px; }
+    .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; margin-top: 1px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .switch__track { position: absolute; inset: 0; background: var(--color-border-strong); border-radius: 100px; transition: .15s; cursor: pointer; }
     .switch__track::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .15s; }

@@ -2,9 +2,10 @@
    prioritet efter SituationEditor.razor. *@
 
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["onboarding"].Summary</p>
 
     <h3>Onboarding <span class="count-badge">@Draft.Config.Onboarding.Count</span></h3>
-    <p class="section-hint">Skärmar som visas första gången appen öppnas, i ordning.</p>
+    <p class="section-hint">Skärmar som visas första gången appen öppnas, i den ordning de listas här.</p>
     <div class="stack-list">
         @foreach (var slide in Draft.Config.Onboarding)
         {
@@ -21,22 +22,24 @@
                     <div>
                         <label>Typ</label>
                         <input @bind="slide.Type" @bind:event="oninput" @bind:after="Notify" placeholder="info" />
+                        <span class="field-note">Vanligast är "info" (bara text) eller "choice" (besökaren väljer ett alternativ, se Valmöjligheter nedan).</span>
                     </div>
                     <div>
                         <label>Inställnings-nyckel <span class="field-note">(valfri)</span></label>
                         <input value="@slide.PrefKey" @onchange="e => { slide.PrefKey = e.Value?.ToString(); Notify(); }" placeholder="lämna tom om ej relevant" />
+                        <span class="field-note">Om besökaren gör ett val här och du vill att appen ska komma ihåg det (t.ex. ett språkval), ange ett namn på var det ska sparas.</span>
                     </div>
                     <div style="grid-column:1/-1">
-                        <label>Rubrik</label>
+                        <label>Rubrik <span class="field-note">(texten besökaren ser överst på skärmen)</span></label>
                         <input @bind="slide.TitleKey" @bind:event="oninput" @bind:after="Notify" />
                     </div>
                     <div style="grid-column:1/-1">
-                        <label>Brödtext</label>
+                        <label>Brödtext <span class="field-note">(den förklarande texten under rubriken)</span></label>
                         <input @bind="slide.BodyKey" @bind:event="oninput" @bind:after="Notify" />
                     </div>
                 </div>
 
-                <label class="field-note" style="display:block;margin-top:8px">Valmöjligheter (om den här skärmen frågar något, t.ex. i onboarding-typen "choice")</label>
+                <label class="field-note" style="display:block;margin-top:8px">Valmöjligheter <span class="field-note">(fylls bara i om Typ ovan är satt till "Val")</span></label>
                 <div class="stack-list stack-list--nested">
                     @foreach (var opt in slide.Options)
                     {
@@ -55,7 +58,7 @@
     <button class="ghost" @onclick="AddOnboardingSlide">+ Onboarding-skärm</button>
 
     <h3 style="margin-top:28px">Handledning <span class="count-badge">@Draft.Config.Tutorial.Count</span></h3>
-    <p class="section-hint">Lättare syskon till onboarding — bara emoji/rubrik/text, ingen förgrening.</p>
+    <p class="section-hint">En enklare variant av onboarding — bara emoji, rubrik och text, inga val besökaren behöver göra.</p>
     <div class="stack-list">
         @foreach (var slide in Draft.Config.Tutorial)
         {
@@ -81,7 +84,13 @@
     <button class="ghost" @onclick="() => { Draft.Config.Tutorial.Add(new TutorialSlide()); Notify(); }">+ Handledningsskärm</button>
 
     <h3 style="margin-top:28px">Badges <span class="count-badge">@Draft.Config.Badges.Count</span></h3>
-    <p class="section-hint">Utvärderas av BadgeService efter varje avbockning. Kräver features.badges = true (se Innehåll-fliken).</p>
+    <p class="section-hint">
+        Utmärkelser besökaren låser upp när de uppnår något i appen.
+        <details class="info-note">
+            <summary>?</summary>
+            <span class="info-note__body">Kräver att funktionen "Badges" är påslagen under Innehåll-fliken — annars visas inga badges i appen även om du lagt in dem här. Appen kontrollerar tyst i bakgrunden efter varje avbockad aktivitet om något villkor nedan är uppfyllt.</span>
+        </details>
+    </p>
     <div class="stack-list">
         @foreach (var badge in Draft.Config.Badges)
         {
@@ -104,15 +113,15 @@
                         <input value="@badge.DescriptionKey" @onchange="e => { badge.DescriptionKey = e.Value?.ToString(); Notify(); }" />
                     </div>
                     <div>
-                        <label>Utlöses av</label>
+                        <label>Utlöses av <span class="field-note">(t.ex. "doneCount" — antal avbockade aktiviteter)</span></label>
                         <input @bind="badge.Trigger.Type" @bind:event="oninput" @bind:after="Notify" placeholder="t.ex. doneCount" />
                     </div>
                     <div>
-                        <label>Tröskelvärde</label>
+                        <label>Tröskelvärde <span class="field-note">(hur många som krävs)</span></label>
                         <input type="number" @bind="badge.Trigger.Threshold" @bind:after="Notify" />
                     </div>
                     <div style="grid-column:1/-1">
-                        <label>Begränsad till kategori <span class="field-note">(valfritt — tom = alla kategorier)</span></label>
+                        <label>Begränsad till kategori <span class="field-note">(valfritt — tom = alla kategorier räknas)</span></label>
                         <select value="@badge.Trigger.Category" @onchange="e => { badge.Trigger.Category = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value!.ToString(); Notify(); }">
                             <option value="">– alla kategorier –</option>
                             @foreach (var cat in Draft.Config.Categories)
@@ -134,12 +143,11 @@
     .editor-pane--wide { max-width: 860px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
     .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
-    .field-note { color: var(--color-text-muted); font-size: 12px; }
     .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
     .stack-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
     .stack-list--nested { margin-top: 6px; }
     .stack-item { padding: 12px; }
-    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger-text); }
     .dict-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
     .dict-editor__add { font-size: 12px; padding: 4px 10px; }
     @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }

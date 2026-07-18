@@ -3,9 +3,10 @@
    fält som bara gick att nå via rå JSON — det är alla fyra av dem här. *@
 
 <div class="editor-pane editor-pane--wide">
+    <p class="help-text">@HelpText.Tabs["situations"].Summary</p>
 
     <h3>Maskot</h3>
-    <p class="section-hint">Visas i tomma tillstånd och vissa laddningslägen.</p>
+    <p class="section-hint">En liten karaktär/emoji som syns när det inte finns något innehåll att visa än, eller under vissa laddningsmoment — ger appen lite personlighet istället för en tom, tyst skärm.</p>
     <div class="field-grid">
         <div>
             <label>Emoji</label>
@@ -14,15 +15,16 @@
         <div>
             <label>Animation</label>
             <input @bind="Draft.Config.Mascot.Animation" @bind:event="oninput" @bind:after="Notify" placeholder="wobble" />
-            <span class="field-note">Fri text — vilka värden UI:t faktiskt animerar avgörs av mascot.css, inte listat här.</span>
+            <span class="field-note">Valfritt. Fri text (t.ex. "wobble", "bounce") — vilka ord som faktiskt ger en rörelse avgörs av hur appen är byggd, inte av något du kan se här. Lämna tomt om du är osäker; ingenting går sönder av det.</span>
         </div>
     </div>
 
     <h3 style="margin-top:28px">Redo nu</h3>
     <label class="toggle-row">
         <input type="checkbox" checked="@(Draft.Config.ReadyNow != null)" @onchange="ToggleReadyNow" />
-        Visa en "redo nu"-sektion (kort urval aktiviteter som matchar Criteria just nu)
+        Visa en "redo nu"-sektion högst upp på startsidan
     </label>
+    <p class="help-text help-text--tight">Ett litet urval aktiviteter (du bestämmer hur många) som matchar de kriterier du ställer in nedan — till exempel en genväg till dagens mest relevanta tips.</p>
     @if (Draft.Config.ReadyNow is { } rn)
     {
         <div class="field-grid" style="margin-top:8px">
@@ -39,12 +41,12 @@
                 <input type="number" min="1" max="20" @bind="rn.Count" @bind:after="Notify" style="width:80px" />
             </div>
         </div>
-        <label class="field-note" style="display:block;margin-top:10px">Kriterier (matchas mot aktiviteternas egna filter-taggar)</label>
+        <label class="field-note" style="display:block;margin-top:10px">Kriterier — vilka filter-taggar en aktivitet måste matcha för att räknas som "redo nu" (samma taggar du sätter på varje aktivitet i Aktiviteter-fliken)</label>
         <DictEditor Dict="rn.Criteria" OnChanged="Notify" AddLabel="Kriterium" />
     }
 
     <h3 style="margin-top:28px">Situationsknappar <span class="count-badge">@Draft.Config.SituationPresets.Count</span></h3>
-    <p class="section-hint">Ett tryck applicerar FilterBundle på det aktiva filtret och visar det vanliga flödet.</p>
+    <p class="section-hint">Genvägsknappar som sätter flera filter på en gång med ett enda tryck — till exempel en "Regnig dag"-knapp som bara visar inomhus-aktiviteter.</p>
     <div class="stack-list">
         @foreach (var preset in Draft.Config.SituationPresets)
         {
@@ -63,7 +65,7 @@
                         <input @bind="preset.LabelKey" @bind:event="oninput" @bind:after="Notify" />
                     </div>
                 </div>
-                <label class="field-note" style="display:block;margin-top:8px">Filter som appliceras</label>
+                <label class="field-note" style="display:block;margin-top:8px">Vilka filter knappen sätter när besökaren trycker på den</label>
                 <DictEditor Dict="preset.FilterBundle" OnChanged="Notify" AddLabel="Filter" />
                 <button class="ghost stack-item__remove" @onclick="() => { Draft.Config.SituationPresets.Remove(preset); Notify(); }">Ta bort</button>
             </div>
@@ -72,7 +74,7 @@
     <button class="ghost" @onclick="AddSituationPreset">+ Situationsknapp</button>
 
     <h3 style="margin-top:28px">Snabbåtgärder <span class="count-badge">@Draft.Config.QuickActions.Count</span></h3>
-    <p class="section-hint">Bredare än situationsknappar — kan även hoppa rakt till en aktivitet eller kategori, inte bara filtrera.</p>
+    <p class="section-hint">Liknar situationsknappar, men kan göra mer — hoppa direkt till en specifik aktivitet eller kategori, inte bara sätta filter.</p>
     <div class="stack-list">
         @foreach (var qa in Draft.Config.QuickActions)
         {
@@ -93,17 +95,17 @@
                     <div>
                         <label>Stil</label>
                         <select @bind="qa.Style" @bind:after="Notify">
-                            <option value="calm">calm</option>
-                            <option value="urgent">urgent</option>
+                            <option value="calm">Lugn — mjuk, diskret färg</option>
+                            <option value="urgent">Uppmärksamhetsväckande — stark, tydlig färg</option>
                         </select>
                     </div>
                     <div>
-                        <label>Beteende</label>
+                        <label>Vad knappen gör</label>
                         <select @bind="qa.Behavior" @bind:after="Notify">
-                            <option value="randomFromPool">Slumpa från urval</option>
-                            <option value="applyFilter">Applicera filter</option>
-                            <option value="openActivity">Öppna aktivitet</option>
-                            <option value="openCategory">Öppna kategori</option>
+                            <option value="randomFromPool">Visa en slumpad aktivitet ur ett urval</option>
+                            <option value="applyFilter">Sätt ett eller flera filter</option>
+                            <option value="openActivity">Öppna en specifik aktivitet direkt</option>
+                            <option value="openCategory">Öppna en specifik kategori direkt</option>
                         </select>
                     </div>
                 </div>
@@ -116,14 +118,14 @@
                 else if (qa.Behavior == "openActivity")
                 {
                     <div style="margin-top:8px">
-                        <label>Aktivitets-id</label>
+                        <label>Vilken aktivitet <span class="field-note">(samma id som den har i Aktiviteter-fliken)</span></label>
                         <input value="@qa.TargetActivityId" @onchange="e => { qa.TargetActivityId = e.Value?.ToString(); Notify(); }" placeholder="t.ex. samma id som i Aktiviteter-fliken" />
                     </div>
                 }
                 else if (qa.Behavior == "openCategory")
                 {
                     <div style="margin-top:8px">
-                        <label>Kategori</label>
+                        <label>Vilken kategori</label>
                         <select value="@qa.TargetCategoryId" @onchange="e => { qa.TargetCategoryId = e.Value?.ToString(); Notify(); }">
                             <option value="">– välj –</option>
                             @foreach (var cat in Draft.Config.Categories)
@@ -145,12 +147,11 @@
     .editor-pane--wide { max-width: 860px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 10px; }
     .section-hint { color: var(--color-text-secondary); font-size: 13px; margin: 2px 0 4px; }
-    .field-note { color: var(--color-text-muted); font-size: 12px; }
     .count-badge { font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
     .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
     .stack-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
     .stack-item { padding: 12px; position: relative; }
-    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger, #c0392b); }
+    .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger-text); }
     @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
 </style>
 
