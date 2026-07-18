@@ -19,7 +19,7 @@
     <div class="activity-list">
         @foreach (var activity in CurrentList)
         {
-            <div class="activity-row @(activity == _selected ? "activity-row--active" : "")" @onclick="() => Select(activity)" @onkeydown="e => { if (e.Key is "Enter" or " ") Select(activity); }" role="button" tabindex="0">
+            <div class="activity-row @(activity == _selected ? "activity-row--active" : "")" @onclick="() => Select(activity)" @onkeydown='e => { if (e.Key is "Enter" or " ") Select(activity); }' role="button" tabindex="0">
                 <span style="font-size:18px">@activity.Emoji</span>
                 <span style="flex:1;text-align:left;min-width:0">
                     <strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@(string.IsNullOrWhiteSpace(activity.Title) ? "(namnlös)" : activity.Title)</strong>

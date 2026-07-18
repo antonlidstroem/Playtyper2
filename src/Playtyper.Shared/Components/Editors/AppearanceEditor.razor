@@ -48,9 +48,9 @@
             @foreach (var font in typo.LocalFonts ??= new())
             {
                 <div class="dict-row">
-                    <input value="@font.File" placeholder="fonts/MinFont-Regular.ttf" @onchange="e => { font.File = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+                    <input value="@font.File" placeholder="fonts/MinFont-Regular.ttf" @onchange='e => { font.File = e.Value?.ToString() ?? ""; Notify(); }' style="flex:1" />
                     <input type="number" value="@font.Weight" placeholder="400" @onchange="e => { font.Weight = int.TryParse(e.Value?.ToString(), out var v) ? v : font.Weight; Notify(); }" style="width:70px" />
-                    <input value="@font.Style" placeholder="normal" @onchange="e => { font.Style = e.Value?.ToString() ?? "normal"; Notify(); }" style="width:90px" />
+                    <input value="@font.Style" placeholder="normal" @onchange='e => { font.Style = e.Value?.ToString() ?? "normal"; Notify(); }' style="width:90px" />
                     <button class="ghost" @onclick="() => { typo.LocalFonts!.Remove(font); Notify(); }">✕</button>
                 </div>
             }
@@ -84,24 +84,24 @@
     <h3 style="margin-top:28px">Kategorilayout <span class="count-badge">@Draft.Config.CategoryLayouts.Count</span></h3>
     <p class="section-hint">Tvingar en specifik vy för en viss kategori, oavsett vad besökaren annars valt.</p>
     <div class="stack-list">
-        @foreach (var layout in Draft.Config.CategoryLayouts)
+        @foreach (var catLayout in Draft.Config.CategoryLayouts)
         {
             <div class="dict-row">
-                <select value="@layout.CategoryId" @onchange="e => { layout.CategoryId = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1">
+                <select value="@catLayout.CategoryId" @onchange='e => { catLayout.CategoryId = e.Value?.ToString() ?? ""; Notify(); }' style="flex:1">
                     <option value="">– välj kategori –</option>
                     @foreach (var cat in Draft.Config.Categories)
                     {
                         <option value="@cat.Id">@cat.Emoji @cat.LabelKey</option>
                     }
                 </select>
-                <select @bind="layout.LayoutMode" @bind:after="Notify" style="width:120px">
+                <select @bind="catLayout.LayoutMode" @bind:after="Notify" style="width:120px">
                     <option value="card">card</option>
                     <option value="list">list</option>
                     <option value="mosaic">mosaic</option>
                     <option value="timeline">timeline</option>
                     <option value="table">table</option>
                 </select>
-                <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Remove(layout); Notify(); }">✕</button>
+                <button class="ghost" @onclick="() => { Draft.Config.CategoryLayouts.Remove(catLayout); Notify(); }">✕</button>
             </div>
         }
     </div>

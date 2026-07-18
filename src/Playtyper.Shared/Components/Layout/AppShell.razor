@@ -99,7 +99,7 @@
     .app-shell__preview-panel { border-left: 1px solid var(--color-border); background: var(--color-surface-1); overflow-y: auto; position: relative; }
 
     /* Reachable below the 1400px breakpoint (see app.css for the base
-       display:none / @media rules) via the "Förhandsvisning" trigger in
+       display:none / @@media rules) via the "Förhandsvisning" trigger in
        the sidebar/bottom-nav above. Two classes combined so this wins over
        the base display:none rule regardless of source order. */
     .app-shell__preview-panel.app-shell__preview-panel--mobile-open {
@@ -116,7 +116,7 @@
 
     .nav-item--preview-trigger { border-top: 1px solid var(--color-border); margin-top: 4px; padding-top: 11px; }
 
-    @media (min-width: 1400px) {
+    @@media (min-width: 1400px) {
         /* The real preview panel is already visible in its normal spot up
            here. The bottom-nav trigger is already hidden by bottom-nav's
            own display:none above 900px, but the SIDEBAR trigger isn't —

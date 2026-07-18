@@ -52,15 +52,15 @@
             <div class="field-grid">
                 <div>
                     <label>App-id <span class="field-note">(ändra bara om du vet varför — kopplar ihop config med driftsättning)</span></label>
-                    <input value="@GetStr("appId")" @onchange="e => SetStr("appId", e.Value?.ToString())" />
+                    <input value="@GetStr("appId")" @onchange='e => SetStr("appId", e.Value?.ToString())' />
                 </div>
                 <div>
                     <label>App-namn</label>
-                    <input value="@GetStr("appName")" @onchange="e => SetStr("appName", e.Value?.ToString())" />
+                    <input value="@GetStr("appName")" @onchange='e => SetStr("appName", e.Value?.ToString())' />
                 </div>
                 <div>
                     <label>Standardpack</label>
-                    <select value="@GetStr("defaultPack")" @onchange="e => SetStr("defaultPack", e.Value?.ToString())">
+                    <select value="@GetStr("defaultPack")" @onchange='e => SetStr("defaultPack", e.Value?.ToString())'>
                         <option value="">– välj –</option>
                         @foreach (var id in _packIds)
                         {
@@ -71,8 +71,8 @@
                 <div>
                     <label>Accentfärg</label>
                     <div style="display:flex;gap:8px;align-items:center">
-                        <input type="color" value="@(GetStr("accentColor") is { Length: > 0 } c ? c : "#E8845A")" @onchange="e => SetStr("accentColor", e.Value?.ToString())" style="width:44px;padding:2px" />
-                        <input value="@GetStr("accentColor")" @onchange="e => SetStr("accentColor", e.Value?.ToString())" placeholder="#E8845A" style="flex:1" />
+                        <input type="color" value="@(GetStr("accentColor") is { Length: > 0 } c ? c : "#E8845A")" @onchange='e => SetStr("accentColor", e.Value?.ToString())' style="width:44px;padding:2px" />
+                        <input value="@GetStr("accentColor")" @onchange='e => SetStr("accentColor", e.Value?.ToString())' placeholder="#E8845A" style="flex:1" />
                     </div>
                 </div>
             </div>
@@ -81,11 +81,11 @@
             <div class="field-grid">
                 <div>
                     <label>Svenska</label>
-                    <textarea rows="3" value="@GetNested("storeDescription", "sv")" @onchange="e => SetNested("storeDescription", "sv", e.Value?.ToString())"></textarea>
+                    <textarea rows="3" value="@GetNested("storeDescription", "sv")" @onchange='e => SetNested("storeDescription", "sv", e.Value?.ToString())'></textarea>
                 </div>
                 <div>
                     <label>Engelska</label>
-                    <textarea rows="3" value="@GetNested("storeDescription", "en")" @onchange="e => SetNested("storeDescription", "en", e.Value?.ToString())"></textarea>
+                    <textarea rows="3" value="@GetNested("storeDescription", "en")" @onchange='e => SetNested("storeDescription", "en", e.Value?.ToString())'></textarea>
                 </div>
             </div>
 
@@ -120,11 +120,11 @@
                     </div>
                     <div>
                         <label>Sessionslängd (timmar)</label>
-                        <input type="number" min="1" value="@GetAuthInt("sessionHours", 24)" @onchange="e => SetAuthInt("sessionHours", e.Value?.ToString())" />
+                        <input type="number" min="1" value="@GetAuthInt("sessionHours", 24)" @onchange='e => SetAuthInt("sessionHours", e.Value?.ToString())' />
                     </div>
                     <div style="grid-column:1/-1">
                         <label>Ledtråd <span class="field-note">(klartext — visas innan pack:ets eget språk är känt)</span></label>
-                        <input value="@GetAuthStr("hint")" @onchange="e => SetAuthStr("hint", e.Value?.ToString())" />
+                        <input value="@GetAuthStr("hint")" @onchange='e => SetAuthStr("hint", e.Value?.ToString())' />
                     </div>
                 </div>
                 <p class="field-note" style="margin-top:6px">Nuvarande hash: <code>@(string.IsNullOrEmpty(GetAuthStr("passwordHash")) ? "(inget satt än)" : GetAuthStr("passwordHash"))</code></p>

@@ -41,8 +41,8 @@
                     @foreach (var opt in slide.Options)
                     {
                         <div class="dict-row">
-                            <input value="@opt.Value" placeholder="värde" @onchange="e => { opt.Value = e.Value?.ToString() ?? ""; Notify(); }" style="width:38%" />
-                            <input value="@opt.LabelKey" placeholder="etikett" @onchange="e => { opt.LabelKey = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+                            <input value="@opt.Value" placeholder="värde" @onchange='e => { opt.Value = e.Value?.ToString() ?? ""; Notify(); }' style="width:38%" />
+                            <input value="@opt.LabelKey" placeholder="etikett" @onchange='e => { opt.LabelKey = e.Value?.ToString() ?? ""; Notify(); }' style="flex:1" />
                             <button class="ghost" @onclick="() => { slide.Options.Remove(opt); Notify(); }">✕</button>
                         </div>
                     }
@@ -126,7 +126,7 @@
             </div>
         }
     </div>
-    <button class="ghost" @onclick="() => { Draft.Config.Badges.Add(new BadgeDefinition { Id = $"badge-{Draft.Config.Badges.Count + 1}" }); Notify(); }">+ Badge</button>
+    <button class="ghost" @onclick='() => { Draft.Config.Badges.Add(new BadgeDefinition { Id = $"badge-{Draft.Config.Badges.Count + 1}" }); Notify(); }'>+ Badge</button>
 </div>
 
 <style>

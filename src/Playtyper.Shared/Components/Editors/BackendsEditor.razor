@@ -57,7 +57,7 @@
             </div>
         }
     </div>
-    <button class="ghost" @onclick="() => { Draft.Config.Backends.Add(new BackendConfig { Id = $"backend-{Draft.Config.Backends.Count + 1}" }); Notify(); }">+ Backend</button>
+    <button class="ghost" @onclick='() => { Draft.Config.Backends.Add(new BackendConfig { Id = $"backend-{Draft.Config.Backends.Count + 1}" }); Notify(); }'>+ Backend</button>
 
     <h3 style="margin-top:28px">Lösenordsskydd</h3>
     <label class="toggle-row">

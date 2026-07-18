@@ -7,7 +7,7 @@
         <div class="dict-row">
             <input value="@key" placeholder="nyckel" @onchange="e => RenameKey(key, e.Value?.ToString())" style="width:38%" />
             <span class="dict-row__eq">=</span>
-            <input value="@Dict[key]" placeholder="värde" @onchange="e => { Dict[key] = e.Value?.ToString() ?? ""; Notify(); }" style="flex:1" />
+            <input value="@Dict[key]" placeholder="värde" @onchange='e => { Dict[key] = e.Value?.ToString() ?? ""; Notify(); }' style="flex:1" />
             <button class="ghost" @onclick="() => { Dict.Remove(key); Notify(); }">✕</button>
         </div>
     }
