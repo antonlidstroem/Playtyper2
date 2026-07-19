@@ -1,0 +1,106 @@
+@* Ersätter DictEditor specifikt för FilterBundle (Situationsknappar,
+   Snabbåtgärder) och Criteria (Redo nu) — samma underliggande typ
+   (Dictionary<string,string>), men nyckeln bör matcha ett filter-id från
+   Innehåll-fliken och värdet ett av just det filtrets giltiga alternativ.
+   Fri text kunde tidigare peka på ett filter som inte finns, eller ett
+   värde det filtret aldrig erbjuder — knappen gjorde då tyst ingenting i
+   den färdiga appen, utan felmeddelande. Datadrivet nu: fel värde blir
+   omöjligt att välja, eftersom valen kommer direkt från packets egna
+   Filters-lista.
+
+   VIKTIGT, verifierat 2026-07-19 mot Playtypus.Core/Services/PackContext.cs
+   (GetFilteredActivities) och FilterState.cs: matchningen är en EXAKT
+   strängjämförelse (fv == value), ingen split på kommatecken eller
+   "matchar något av flera". Det gäller även filter av typen multiSelect —
+   trots namnet kan ett FilterBundle/Criteria-värde bara sätta ETT enda
+   alternativ åt gången för ett sådant filter (multiSelect styr bara hur
+   BESÖKAREN interagerar med filtret i appens egna filtermeny, inte vad en
+   situationsknapp kan sätta). Därför är värdekontrollen nedan alltid en
+   enkel dropdown, aldrig kryssrutor — kryssrutor hade antytt en förmåga
+   (flera samtidiga värden) som inte faktiskt finns i det här systemet. *@
+
+<div class="filter-bundle-editor">
+    @foreach (var key in Dict.Keys.ToList())
+    {
+        var filter = Filters.FirstOrDefault(f => f.Id == key);
+        <div class="filter-bundle-row">
+            <select value="@key" @onchange="e => RenameKey(key, e.Value?.ToString())">
+                <option value="@key" disabled="@(filter != null)">@(filter != null ? $"{filter.LabelKey} ({filter.Id})" : $"⚠ okänt filter: {key}")</option>
+                @foreach (var f in Filters.Where(f => f.Id != key))
+                {
+                    <option value="@f.Id">@f.LabelKey (@f.Id)</option>
+                }
+            </select>
+            <span class="filter-bundle-row__eq">→</span>
+            @if (filter != null && filter.Options.Count > 0)
+            {
+                <select value="@Dict[key]" @onchange='e => { Dict[key] = e.Value?.ToString() ?? ""; Notify(); }'>
+                    <option value="">– välj värde –</option>
+                    @foreach (var opt in filter.Options)
+                    {
+                        <option value="@opt.Value">@opt.LabelKey</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <input value="@Dict[key]" placeholder="värde" disabled="@(filter == null)"
+                       @onchange='e => { Dict[key] = e.Value?.ToString() ?? ""; Notify(); }' />
+            }
+            <button class="ghost" @onclick="() => { Dict.Remove(key); Notify(); }">✕</button>
+        </div>
+        @if (filter == null)
+        {
+            <p class="field-note filter-bundle-row__warning">Det här filtret finns inte längre på Innehåll-fliken — knappen gör troligen ingenting i appen. Ta bort raden, eller välj ett giltigt filter ovan.</p>
+        }
+    }
+
+    @if (Filters.Count == 0)
+    {
+        <p class="field-note">Inga filter är definierade än på Innehåll-fliken — lägg till minst ett där först, annars finns inget att koppla den här knappen till.</p>
+    }
+    else if (Dict.Keys.Count(k => Filters.Any(f => f.Id == k)) < Filters.Count)
+    {
+        <button class="ghost filter-bundle-editor__add" @onclick="AddRow">+ @AddLabel</button>
+    }
+</div>
+
+<style>
+    .filter-bundle-editor { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+    .filter-bundle-row { display: flex; align-items: center; gap: 6px; }
+    .filter-bundle-row select, .filter-bundle-row input { flex: 1; min-width: 0; }
+    .filter-bundle-row__eq { color: var(--color-text-muted); font-size: 12px; flex-shrink: 0; }
+    .filter-bundle-row__warning { color: var(--color-warning-text); margin: -2px 0 4px; }
+    .filter-bundle-editor__add { align-self: flex-start; font-size: 12px; padding: 4px 10px; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public Dictionary<string, string> Dict { get; set; } = default!;
+    [Parameter, EditorRequired] public List<FilterConfig> Filters { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public string AddLabel { get; set; } = "Filter";
+
+    private void RenameKey(string oldKey, string? newKeyRaw)
+    {
+        var newKey = newKeyRaw ?? oldKey;
+        if (newKey == oldKey || string.IsNullOrWhiteSpace(newKey)) return;
+        if (Dict.ContainsKey(newKey)) return; // undvik att tysta skriva över en annan rad
+        var value = Dict[oldKey];
+        Dict.Remove(oldKey);
+        // Nytt filter kan ha helt andra giltiga värden än det gamla — värdet
+        // följer INTE med, annars riskerar man en tyst felmatchning (samma
+        // typ av fel den här komponenten finns till för att förhindra).
+        Dict[newKey] = "";
+        Notify();
+    }
+
+    private void AddRow()
+    {
+        var firstUnused = Filters.FirstOrDefault(f => !Dict.ContainsKey(f.Id));
+        if (firstUnused == null) return; // alla filter redan tillagda
+        Dict[firstUnused.Id] = "";
+        Notify();
+    }
+
+    private void Notify() => OnChanged.InvokeAsync();
+}

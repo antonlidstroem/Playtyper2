@@ -188,6 +188,21 @@ input[type="text"], input[type="color"], input[type="number"], input:not([type])
   transition: border-color 120ms ease;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--color-accent); }
+
+/* Live-fältvalidering (t.ex. kebab-case-kontroll för repo-/kund-id-fält)
+   — röd kant på fältet plus en kort felrad direkt under. Generell klass,
+   inte bindad till ett specifikt fält eller en specifik sida. */
+input.input-invalid, select.input-invalid, textarea.input-invalid {
+  border-color: var(--color-danger-text);
+}
+input.input-invalid:focus-visible, select.input-invalid:focus-visible, textarea.input-invalid:focus-visible {
+  border-color: var(--color-danger-text);
+}
+.field-error {
+  color: var(--color-danger-text);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
 textarea { font-family: var(--font-mono); font-size: 13px; resize: vertical; }
 input[type="color"] { padding: 2px; height: 34px; cursor: pointer; }
 

@@ -1,59 +1,124 @@
-@* Tokens-fliken. Theme-dictionaryn är fritt formad (vilka CSS-variabler ett
-   pack faktiskt har varierar), så UI:t itererar det som finns snarare än
-   att anta fasta fältnamn - men försöker hitta en rimlig "bakgrund"-nyckel
-   att kontrastberäkna mot, som en hjälp snarare än en garanti. *@
+@* Tokens-fliken (färger). Byggd 2026-07-19 ur en verifierad kartläggning
+   av vilka --color-*-variabler Playtypus-appens CSS faktiskt läser via
+   var(...) — se HelpText.cs:s ColorTokenGroups för källan och det fulla
+   resonemanget bakom varje grupp/HasWorkingFallback-värde. Ersätter den
+   tidigare fria nyckel/värde-listan ("+ Lägg till token") helt: varje
+   känd variabel har nu en egen, förklarad rad istället för att kräva att
+   användaren redan vet det exakta tekniska namnet.
 
-<div class="editor-pane">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-        <h3 style="margin:0">Tokens</h3>
-        <div class="theme-toggle">
-            <button class="@(_mode == "light" ? "theme-toggle__btn--active" : "")" @onclick='() => _mode = "light"'>Ljust</button>
-            <button class="@(_mode == "dark" ? "theme-toggle__btn--active" : "")" @onclick='() => _mode = "dark"'>Mörkt</button>
+   Kontrastvarningen (mot color-background) är samma idé som innan, men
+   jämför nu mot den FAKTISKA color-background-nyckeln istället för att
+   gissa fram en bakgrundsnyckel via .Contains("bg") — den gamla koden
+   kunde råka hitta fel nyckel (t.ex. color-warning-bg) om appen inte
+   hade satt color-background alls.
+
+   Fri inmatning av EGNA/okända variabelnamn flyttas till Avancerat-fliken
+   (AdvancedJsonEditor.razor), som redan kan redigera theme.css/
+   theme-dark.css som rå text via PackDraft.ThemeFromCss — ingen ny
+   koppling behövde byggas för det, den fanns redan. *@
+
+<div class="editor-pane editor-pane--wide">
+    <div class="token-editor__header">
+        <div>
+            <h3 style="margin-bottom:2px">Färger</h3>
+            <p class="help-text help-text--tight" style="margin-bottom:0">
+                Sätt de färger du vill styra själv för @Draft.PackId. Lämnar du något osatt används appens eget standardutseende där det finns — se markeringen på varje rad.
+            </p>
+        </div>
+        <div class="token-editor__mode-toggle" role="tablist">
+            <button role="tab" aria-selected="@(_mode == "light")" class="@(_mode == "light" ? "token-editor__mode--active" : "")" @onclick='() => _mode = "light"'>☀️ Ljust läge</button>
+            <button role="tab" aria-selected="@(_mode == "dark")" class="@(_mode == "dark" ? "token-editor__mode--active" : "")" @onclick='() => _mode = "dark"'>🌙 Mörkt läge</button>
         </div>
     </div>
-    <p style="color:var(--color-text-secondary)">Färger för @Draft.PackId. Kontrastvarningar jämför mot den mest sannolika bakgrundsfärgen.</p>
+    <p class="field-note" style="margin-top:-4px">
+        Ljust och mörkt läge sparas som två separata uppsättningar — samma färg måste sättas i båda om du vill att den ska synas likadant oavsett vilket läge besökaren använder.
+    </p>
 
     @{
         var theme = _mode == "light" ? Draft.ThemeLight : Draft.ThemeDark;
-        var bgKey = theme.Keys.FirstOrDefault(k => k.Contains("background", StringComparison.OrdinalIgnoreCase) || k.Contains("bg", StringComparison.OrdinalIgnoreCase));
-        var bgValue = bgKey != null ? theme[bgKey] : null;
+        var bgValue = theme.TryGetValue("color-background", out var bg) ? bg : null;
     }
 
-    <div class="token-grid">
-        @foreach (var key in theme.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList())
-        {
-            var value = theme[key];
-            var ratio = bgValue != null && key != bgKey ? ContrastChecker.ContrastRatio(value, bgValue) : null;
-
-            <div class="card token-card">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <input type="color" value="@ToColorInputValue(value)"
-                           @onchange="e => SetToken(theme, key, e.Value?.ToString() ?? value)"
-                           style="width:32px;height:28px;padding:0;flex-shrink:0" />
-                    <span style="font-size:13px;word-break:break-all">@key</span>
-                </div>
-                <input value="@value" @onchange="e => SetToken(theme, key, e.Value?.ToString() ?? value)" />
-                @if (ratio != null)
+    @foreach (var group in HelpText.ColorTokenGroups)
+    {
+        <div class="token-group">
+            <h4 class="token-group__title">@group.Title</h4>
+            <p class="field-note" style="margin:0 0 8px">@group.Summary</p>
+            <div class="token-group__list">
+                @foreach (var token in group.Tokens)
                 {
-                    var pass = ratio.Value >= 4.5;
-                    <span class="badge @(pass ? "badge-success" : "badge-warning")" style="margin-top:6px">
-                        Kontrast @ratio.Value.ToString("0.0") @(pass ? "· AA ok" : "· under AA (4.5)")
-                    </span>
+                    var current = theme.TryGetValue(token.Keys[0], out var v) ? v : null;
+                    var isSet = current != null;
+                    var ratio = isSet && bgValue != null && token.Keys[0] != "color-background"
+                        ? ContrastChecker.ContrastRatio(current!, bgValue)
+                        : null;
+
+                    <div class="token-row">
+                        <input type="color" value="@ToColorInputValue(current ?? "#888888")"
+                               @onchange="e => SetToken(theme, token, e.Value?.ToString())" />
+                        <div class="token-row__text">
+                            <span class="token-row__label">
+                                @token.Label
+                                @if (!token.HasWorkingFallback)
+                                {
+                                    <span class="tab-badge" title="Har inget eget standardutseende i appen — rekommenderas satt">rekommenderas</span>
+                                }
+                            </span>
+                            <span class="field-note">@token.Description</span>
+                            @if (ratio != null)
+                            {
+                                var pass = ratio.Value >= 4.5;
+                                <span class="badge @(pass ? "badge-success" : "badge-warning")" style="margin-top:3px;width:fit-content">
+                                    Kontrast mot sidbakgrund: @ratio.Value.ToString("0.0") @(pass ? "· OK" : "· lågt, svårläst")
+                                </span>
+                            }
+                        </div>
+                        @if (isSet)
+                        {
+                            <button class="ghost token-row__clear" title="Ta bort — appens standardutseende används då istället" @onclick="() => ClearToken(theme, token)">Återställ</button>
+                        }
+                        else
+                        {
+                            <span class="token-row__unset-hint">Ej satt</span>
+                        }
+                    </div>
                 }
             </div>
-        }
-    </div>
+        </div>
+    }
 
-    <button class="ghost" style="margin-top:16px" @onclick="AddToken">+ Lägg till token</button>
+    <div class="token-editor__footer">
+        <p class="field-note">
+            Behöver du sätta en färgvariabel som inte listas ovan? Den fullständiga, råa listan går att redigera direkt under <strong>Avancerat</strong>-fliken (filerna <code>theme.css</code> och <code>theme-dark.css</code>).
+        </p>
+    </div>
 </div>
 
 <style>
-    .theme-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
-    .theme-toggle button { border: none; border-radius: 0; padding: 4px 12px; font-size: 12px; }
-    .theme-toggle__btn--active { background: var(--color-accent); color: var(--color-accent-text); }
-    .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 12px; }
-    .token-card { padding: 10px; }
-    .token-swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--color-border); flex-shrink: 0; }
+    .token-editor__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .token-editor__mode-toggle { display: flex; gap: 2px; background: var(--color-surface-2); border-radius: var(--radius-sm); padding: 2px; flex-shrink: 0; }
+    .token-editor__mode-toggle button { border: none; background: transparent; padding: 6px 12px; font-size: 13px; border-radius: calc(var(--radius-sm) - 2px); }
+    .token-editor__mode-toggle button.token-editor__mode--active { background: var(--color-surface-1); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+    .token-group { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+    .token-group:first-of-type { margin-top: 18px; }
+    .token-group__title { margin: 0 0 2px; font-size: 14px; }
+    .token-group__list { display: flex; flex-direction: column; gap: 2px; }
+
+    .token-row { display: flex; align-items: center; gap: 12px; padding: 7px 4px; border-radius: var(--radius-sm); }
+    .token-row:hover { background: var(--color-surface-2); }
+    .token-row input[type="color"] { width: 36px; height: 36px; padding: 2px; flex-shrink: 0; }
+    .token-row__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .token-row__label { font-size: 13.5px; font-weight: 500; }
+    .token-row__clear { font-size: 12px; padding: 4px 10px; flex-shrink: 0; }
+    .token-row__unset-hint { font-size: 12px; color: var(--color-text-muted); flex-shrink: 0; padding: 4px 10px; }
+
+    .token-editor__footer { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--color-border); }
+
+    @@media (max-width: 560px) {
+        .token-row { flex-wrap: wrap; }
+        .token-row__clear, .token-row__unset-hint { margin-left: 48px; }
+    }
 </style>
 
 @code {
@@ -62,24 +127,25 @@
 
     private string _mode = "light";
 
-    private void SetToken(Dictionary<string, string> theme, string key, string value)
+    /// <summary>
+    /// En token kan representera flera dictionary-nycklar samtidigt (bara
+    /// Accentfärg gör detta idag — se HelpText.ColorTokenGroups kommentar
+    /// om color-accent/color-primary). Sätter samma värde på samtliga.
+    /// </summary>
+    private void SetToken(Dictionary<string, string> theme, HelpText.ColorToken token, string? rawValue)
     {
-        theme[key] = value;
+        var value = ToColorInputValue(rawValue ?? "#888888");
+        foreach (var key in token.Keys)
+            theme[key] = value;
         OnChanged.InvokeAsync();
     }
 
-    private void AddToken()
+    private void ClearToken(Dictionary<string, string> theme, HelpText.ColorToken token)
     {
-        var theme = _mode == "light" ? Draft.ThemeLight : Draft.ThemeDark;
-        var name = "new-token";
-        var i = 1;
-        while (theme.ContainsKey(name)) name = $"new-token-{i++}";
-        theme[name] = "#888888";
+        foreach (var key in token.Keys)
+            theme.Remove(key);
         OnChanged.InvokeAsync();
     }
-
-    private static string SafeColor(string value) =>
-        ContrastChecker.TryParseHex(value, out _) ? value : "#888888";
 
     private static string ToColorInputValue(string value)
     {

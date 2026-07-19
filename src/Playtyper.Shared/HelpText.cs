@@ -296,4 +296,117 @@ public static class HelpText
         new("surface", "Följer ytan", "Sidhuvudet smälter in i bakgrunden bakom det, ingen tydlig gräns."),
         new("transparent", "Genomskinligt", "Sidhuvudet syns bara som text/ikoner ovanpå innehållet, ingen egen bakgrund alls."),
     };
+
+    // ── Färgvariabler (TokenEditor) ──────────────────────────────────────
+
+    /// <param name="Keys">
+    /// Dictionary-nyckeln/nycklarna i PackDraft.ThemeLight/ThemeDark UTAN
+    /// "--"-prefix (PackDraft.ThemeToCss lägger till det självt vid export
+    /// — en post här med "color-accent" blir "--color-accent" i den
+    /// genererade theme.css). Nästan alltid en enda nyckel; ColorAccent
+    /// nedan är det enda undantaget (se dess egen kommentar).
+    /// </param>
+    /// <param name="Label">Vardagsspråks-namn, visas i UI:t istället för den råa variabeln.</param>
+    /// <param name="Description">Var i appen färgen faktiskt syns.</param>
+    /// <param name="HasWorkingFallback">
+    /// True om Playtypus-appens CSS har ett eget reservvärde för variabeln
+    /// (dvs lämnas den osatt blir resultatet ett rimligt utseende, inte ett
+    /// trasigt eller osynligt element) — verifierat genom att leta efter
+    /// "var(--namn, fallback-värde)" i den faktiska CSS-koden, inte antaget.
+    /// UI:t använder detta för att skilja "valfri finjustering" från
+    /// "påverkar utseendet märkbart om den lämnas tom".
+    /// </param>
+    public sealed record ColorToken(string[] Keys, string Label, string Description, bool HasWorkingFallback);
+
+    public sealed record ColorTokenGroup(string Title, string Summary, IReadOnlyList<ColorToken> Tokens);
+
+    /// <summary>
+    /// De fem grupperna, i den ordning de ska visas. Innehållet är
+    /// framtaget 2026-07-19 genom att söka igenom Playtypus.Core/wwwroot/
+    /// css/*.css efter faktiska var(--namn)-anrop — inte en gissad lista.
+    /// En känd, avsiktlig förenkling: --color-accent och --color-primary
+    /// verkar användas delvis omväxlande mellan olika CSS-filer i
+    /// Playtypus-appen (feel.css använder color-primary, detail-zones.css/
+    /// gallery.css/mosaic.css använder color-accent) — snarare än att
+    /// tvinga fram en konstgjord skillnad UI:t inte kan verifiera, slås de
+    /// ihop till EN synlig post (se ColorAccent nedan) som skriver samma
+    /// värde till båda dictionary-nycklarna. Om Playtypus-appen någon gång
+    /// gör en medveten, dokumenterad skillnad mellan de två, dela upp
+    /// posten igen då — men gissa inte fram en skillnad här som inte går
+    /// att bekräfta i källan.
+    /// </summary>
+    public static readonly IReadOnlyList<ColorTokenGroup> ColorTokenGroups = new List<ColorTokenGroup>
+    {
+        new("Bas & ytor", "Bakgrunden och de vanligaste ytorna — kort, paneler, listor.", new List<ColorToken>
+        {
+            new(new[] { "color-background" }, "Sidbakgrund",
+                "Bakgrunden bakom allt annat i appen. Saknar oftast eget standardvärde — bör sättas.", false),
+            new(new[] { "color-surface" }, "Innehållsyta",
+                "Den vanligaste ytfärgen — kort, paneler, modaler, listrader. Den enskilt mest använda färgen i hela appen. Saknar oftast eget standardvärde — bör sättas.", false),
+            new(new[] { "color-surface-alt" }, "Yta vid hover",
+                "Visas kort när besökaren för musen över eller trycker på ett element. Saknar oftast eget standardvärde.", false),
+            new(new[] { "color-card" }, "Kortbakgrund",
+                "En alternativ, mer specifik kortbakgrund på vissa ställen (har annars vit som standard).", true),
+            new(new[] { "color-surface-raised" }, "Upphöjd yta",
+                "En yta som ska kännas \"lyft\" ovanför resten, t.ex. i bildgalleriet.", true),
+            new(new[] { "color-surface-warm" }, "Varm yta",
+                "En varmare ytton, används i detaljvyns bildsektion.", false),
+        }),
+
+        new("Text", "Textfärger, för olika grad av betoning.", new List<ColorToken>
+        {
+            new(new[] { "color-text" }, "Brödtext",
+                "Den vanliga, allmänna textfärgen i appen. Saknar oftast eget standardvärde — bör sättas.", false),
+            new(new[] { "color-text-muted" }, "Dämpad text",
+                "Mindre viktig text — hjälptexter, tidsstämplar, sekundär information. Saknar oftast eget standardvärde.", false),
+            new(new[] { "color-text-primary" }, "Rubriktext (detaljvy)",
+                "En starkare textfärg specifikt i detalj- och galleriläge.", true),
+            new(new[] { "color-text-secondary" }, "Undertext (detaljvy)",
+                "En något dämpad textfärg specifikt i detalj- och galleriläge.", true),
+            new(new[] { "color-text-tertiary" }, "Finstilt (detaljvy)",
+                "Den svagaste textnyansen, specifikt i detalj- och galleriläge — sällan behövd.", true),
+        }),
+
+        new("Accentfärg", "Appens genomgående huvudfärg — knappar, länkar, markeringar.", new List<ColorToken>
+        {
+            new(new[] { "color-accent", "color-primary" }, "Accentfärg",
+                "Huvudfärgen som återkommer i hela appen: knappar, aktiva flikar, länkar och markeringar. Sätter samma värde på två närbesläktade tekniska variabelnamn som olika delar av appen råkar använda (color-accent och color-primary) — ett medvetet val för att slippa be dig hålla reda på skillnaden mellan dem. Rekommenderas starkt att sättas: en av de två underliggande variablerna saknar oftast eget standardvärde.", false),
+            new(new[] { "color-text-on-primary" }, "Text ovanpå accentfärg",
+                "Textfärgen på knappar och ytor som redan har accentfärgen som bakgrund — måste synas tydligt mot den. Rekommenderas satt om du sätter Accentfärg ovan, annars är risken att text blir svårläst.", false),
+            new(new[] { "color-primary-light" }, "Accentfärg, ljusare",
+                "En ljusare variant av accentfärgen — används på flera ställen (t.ex. markerade knappar och valda alternativ) som SAKNAR ett eget standardvärde i de flesta fall. Rekommenderas satt om du redan sätter Accentfärg ovan.", false),
+            new(new[] { "color-primary-ghost" }, "Accentfärg, transparent",
+                "En genomskinlig variant av accentfärgen, sällan behövd — har ett fungerande standardvärde.", true),
+        }),
+
+        new("Status", "Färger för klarmarkeringar, varningar och fel.", new List<ColorToken>
+        {
+            new(new[] { "color-success" }, "Lyckades / klart",
+                "Visas t.ex. när något sparats eller en aktivitet markerats klar.", true),
+            new(new[] { "color-done" }, "Avbockad aktivitet",
+                "Färgen på markeringen när besökaren bockat av en aktivitet som klar.", true),
+            new(new[] { "color-warning-bg" }, "Varning, bakgrund",
+                "Bakgrundsfärgen på varningsmeddelanden.", true),
+            new(new[] { "color-warning-text" }, "Varning, text",
+                "Textfärgen i varningsmeddelanden — bör synas tydligt mot varningens bakgrund ovan.", true),
+            new(new[] { "color-danger" }, "Fara / destruktiv åtgärd",
+                "Används för t.ex. ta bort-knappar och allvarliga varningar.", true),
+            new(new[] { "color-error" }, "Fel",
+                "Visas när något gått fel, t.ex. ett formulärfel. Saknar oftast eget standardvärde.", false),
+            new(new[] { "color-info-bg" }, "Information, bakgrund",
+                "Bakgrundsfärgen på informationsmeddelanden (neutrala, inte varningar).", true),
+            new(new[] { "color-info-text" }, "Information, text",
+                "Textfärgen i informationsmeddelanden — bör synas tydligt mot bakgrunden ovan.", true),
+        }),
+
+        new("Övrigt", "Enstaka, mer specifika färger.", new List<ColorToken>
+        {
+            new(new[] { "color-border" }, "Kantlinjer",
+                "Tunna linjer som skiljer element åt, t.ex. runt kort eller mellan listrader. Saknar oftast eget standardvärde.", false),
+            new(new[] { "color-hover-bg" }, "Bakgrund vid hover",
+                "En generell hover-bakgrund som används på några ytterligare ställen utöver Yta vid hover ovan.", true),
+            new(new[] { "color-panic-glow" }, "Panik-knappens glöd",
+                "Glödeffekten runt panik-knappen (den du ställer in på Identitet-fliken).", true),
+        }),
+    };
 }

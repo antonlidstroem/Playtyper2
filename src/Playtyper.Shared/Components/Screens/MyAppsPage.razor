@@ -65,7 +65,12 @@
             <p class="field-note" style="margin:-2px 0 4px">
                 En kort, teknisk identifierare för kunden — bara små bokstäver, siffror och bindestreck (t.ex. <code>borasstad</code>). Används internt i filnamn och webbadresser, syns aldrig för kundens besökare. Går inte att ändra senare, så välj något kort och tydligt.
             </p>
-            <input @bind="_newCustomerId" @bind:event="oninput" placeholder="borasstad" />
+            <input @bind="_newCustomerId" @bind:event="oninput" placeholder="borasstad"
+                   class="@(CustomerIdError != null ? "input-invalid" : "")" />
+            @if (CustomerIdError != null)
+            {
+                <p class="field-error">⚠ @CustomerIdError</p>
+            }
 
             <label style="margin-top:14px">App-namn</label>
             <p class="field-note" style="margin:-2px 0 4px">Det riktiga namnet, det som visas i appen och på kundens hemskärm.</p>
@@ -83,7 +88,12 @@
 
             <label style="margin-top:14px">Namn på GitHub-repot</label>
             <p class="field-note" style="margin:-2px 0 4px">Var koden och innehållet faktiskt lagras på GitHub. Lämna tomt för ett föreslaget namn baserat på Kund-ID.</p>
-            <input @bind="_newRepoName" placeholder="@SuggestedRepoName" />
+            <input @bind="_newRepoName" @bind:event="oninput" placeholder="@SuggestedRepoName"
+                   class="@(RepoNameError != null ? "input-invalid" : "")" />
+            @if (RepoNameError != null)
+            {
+                <p class="field-error">⚠ @RepoNameError</p>
+            }
 
             <label style="margin-top:14px">Organisation <span class="field-note">(lämna tomt för ditt eget GitHub-konto)</span></label>
             <input @bind="_newOrg" />
@@ -102,7 +112,7 @@
 
             <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
                 <button class="ghost" @onclick="() => _showCreateForm = false" disabled="@_creating">Avbryt</button>
-                <button class="primary" @onclick="CreateAsync" disabled="@(_creating || string.IsNullOrWhiteSpace(_newCustomerId) || string.IsNullOrWhiteSpace(_newAppName))">
+                <button class="primary" @onclick="CreateAsync" disabled="@(_creating || string.IsNullOrWhiteSpace(_newCustomerId) || string.IsNullOrWhiteSpace(_newAppName) || CustomerIdError != null || RepoNameError != null)">
                     @if (_creating) { <span class="spinner"></span> } else { <text>Skapa</text> }
                 </button>
             </div>
@@ -156,6 +166,30 @@
 
     private string SuggestedAppId => GitHubOperator.SuggestAppId(_newCustomerId ?? "");
     private string SuggestedRepoName => GitHubOperator.SuggestRepoName(_newCustomerId ?? "");
+
+    // Live-validering direkt i fältet — SuggestAppId/SuggestRepoName gör
+    // ingen egen normalisering (bara .Replace("-","") och gemener, se
+    // GitHubOperator.cs), så utan detta skulle ett ogiltigt tecken flyta
+    // rakt igenom till GitHubs API och upptäckas först som ett obegripligt
+    // API-fel efter att formuläret redan skickats in. Reglerna nedan är
+    // standard kebab-case: gemener, siffror, bindestreck, inget bindestreck
+    // först/sist eller dubblerat.
+    private static readonly System.Text.RegularExpressions.Regex KebabCasePattern =
+        new(@"^[a-z0-9]+(-[a-z0-9]+)*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string? ValidateKebabCase(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null; // tomt hanteras separat (Skapa-knappens disabled), inte som ett formatfel här
+        if (value.Any(char.IsUpper)) return "Bara små bokstäver — inga versaler.";
+        if (value.Contains(' ')) return "Inga mellanslag — använd bindestreck istället, t.ex. \"stora-mellansjo\".";
+        if (value.StartsWith('-') || value.EndsWith('-')) return "Får inte börja eller sluta med bindestreck.";
+        if (value.Contains("--")) return "Inga dubbla bindestreck efter varandra.";
+        if (!KebabCasePattern.IsMatch(value)) return "Bara vanliga bokstäver a-z, siffror och bindestreck är tillåtet — inga å/ä/ö eller specialtecken.";
+        return null;
+    }
+
+    private string? CustomerIdError => ValidateKebabCase(_newCustomerId);
+    private string? RepoNameError => ValidateKebabCase(_newRepoName);
 
     protected override async Task OnInitializedAsync()
     {

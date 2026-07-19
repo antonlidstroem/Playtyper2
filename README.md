@@ -47,6 +47,70 @@ Konkret:
 Samma "ingen kompilator tillgänglig"-begränsning som resten av det här
 dokumentet beskriver gällde även den här omgången — se nästa avsnitt.
 
+## 2026-07-19: Cloudflare-projektskapande, mer datadrivna val, guidning
+
+En uppföljande omgång på samma tema — göra Playtyper mer pedagogiskt och
+förlåtande. Två delar:
+
+**Bugg upptäckt av användaren:** en första driftsättning till Cloudflare
+Pages misslyckades med "Project not found" (kod 8000007). Grundorsaken var
+att `CloudflareApiService.EnsureProjectAsync` (redan porterad från
+PackWizard, aldrig borttagen) aldrig anropades från `DeployPage.razor` —
+ett hål som fanns redan innan 2026-07-18-omgången, men som borde ha
+upptäckts då. Åtgärdat: `SaveWorkflowAsync` säkerställer nu att Cloudflare
+Pages-projektet finns INNAN workflow-filen sparas, med tydlig återkoppling
+om projektet fanns, skapades, eller om något gick fel (då sparas inte
+workflow-filen, för att undvika att peka på ett projekt som inte finns).
+
+**Fritext → datadrivna val, där det går att göra korrekt:**
+- **Tokens-fliken (färger)** byggdes om helt: en verifierad kartläggning av
+  samtliga ~30 `--color-*`-variabler Playtypus-appens CSS faktiskt läser
+  (sökt fram i `Playtypus.Core/wwwroot/css/*.css`, inte gissat), grupperade
+  i fem kategorier med vardagsspråks-namn, en förklaring av var varje färg
+  syns, och en markering av om variabeln har ett fungerande CSS-
+  standardvärde eller inte. `--color-accent`/`--color-primary` slås
+  medvetet ihop till ett synligt fält (de används delvis omväxlande i olika
+  CSS-filer i Playtypus-appen) — ett dokumenterat, avsiktligt
+  förenklingsval, inte en bortglömd detalj. Fri inmatning av
+  okända/framtida variabelnamn flyttades till Avancerat-fliken (som redan
+  kunde hantera rå CSS via `PackDraft.ThemeFromCss`).
+- **FilterBundle** (Situationsknappar, Snabbåtgärder, Redo nu) fick en ny,
+  specialiserad `FilterBundleEditor` istället för `DictEditor`s fria
+  nyckel/värde-fält — nyckeln är nu en dropdown av packets egna filter-id:n,
+  värdet en dropdown av just det filtrets giltiga alternativ. Under arbetet
+  verifierades mot `Playtypus.Core/Services/PackContext.cs` att matchningen
+  är en exakt strängjämförelse (`fv == value`) utan stöd för flera samtidiga
+  värden — även för filter av typen multiSelect. Editorn byggdes därför med
+  en enkel dropdown genomgående, inte kryssrutor, för att inte antyda en
+  förmåga (flera värden samtidigt) som Playtypus-appen faktiskt inte har.
+- **Statuspunkter per flik** (`TabCompletion.cs`, kopplat i `AppShell`s
+  sidopanel): en enkel, icke-blockerande grön/tom-prick per flik baserat på
+  om de mest grundläggande fälten är ifyllda. Ingen tvingad ordning — ett
+  första, mindre steg mot fylligare guidning genom redigeringsflödet. Ett
+  större, styrt första-gången-flöde diskuterades men sköts upp till en
+  eventuell separat omgång.
+- **DiffView** fick en mänsklig sammanfattningsrad per filändring (App-namn/
+  kategori-/filterändringar, antal tillagda/borttagna/ändrade aktiviteter,
+  vilket temaläge som ändrades) ovanpå den redan befintliga rå JSON/CSS-
+  vyn, som finns kvar oförändrad bakom "Visa exakta rader" för felsökning.
+  Under arbetet hittades och åtgärdades två korrekthetsrisker i
+  sammanfattningslogiken innan de hann bli buggar: en jämförelse som
+  förlitade sig på att JSON-serialisering av `Dictionary`-fält (Activity har
+  flera) ger stabil ordning mellan två separata anrop (inte garanterat),
+  och en `ToDictionary`-användning som hade kunnat kasta om två aktiviteter
+  råkade dela samma id (`ActivityTable.AddActivity`s id-generering
+  garanterar inte unikhet).
+- Kvarglömda referenser till det interna verktygsnamnet "Packwizard" i
+  user-facing text (fanns kvar i `BundlePage.razor` och `PackListPage.razor`
+  trots att de togs bort från `CreatePackPage.razor` i förra omgången) städades
+  bort. Kvar i ett fåtal `@code`-kommentarer riktade till nästa utvecklare,
+  vilket är rätt målgrupp för det namnet.
+- Live-validering (kebab-case: gemener, siffror, bindestreck) lades till
+  direkt i Kund-ID- och repo-namn-fälten i "Skapa app"-formuläret — innan
+  detta kunde ett ogiltigt tecken (mellanslag, å/ä/ö, versaler) flyta rakt
+  igenom till GitHubs API och upptäckas först som ett obegripligt fel efter
+  att formuläret redan skickats in.
+
 ## Läs det här avsnittet först
 
 Den här lösningen är **skriven för hand, fil för fil, men aldrig kompilerad**.

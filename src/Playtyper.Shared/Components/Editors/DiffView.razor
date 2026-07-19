@@ -1,4 +1,11 @@
-@* Fil-nivå-diff, se motiveringen i PackDraft.cs. *@
+@* Fil-nivå-diff, se motiveringen i PackDraft.cs. En kort, mänsklig
+   sammanfattningsrad läggs till 2026-07-19 ovanpå den råa fil-listan
+   (Summarize nedan) — den detaljerade JSON/CSS-vyn bakom "Visa före/efter"
+   rörs inte, den behövs fortfarande för felsökning och för den som redan
+   kan läsa formatet. Sammanfattningen är en bästa-ansträngning: om en fil
+   inte matchar något av de kända mönstren (t.ex. en helt ny filtyp
+   Playtypus lägger till senare) visas bara "Innehållet ändrades" — aldrig
+   ett fel, aldrig tomt. *@
 
 <h3>Ändringar</h3>
 
@@ -17,17 +24,18 @@ else
     @foreach (var change in changes)
     {
         <div class="card diff-file">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
                 <span class="badge @(change.Kind == FileChangeKind.Added ? "badge-success" : "badge-warning")">
                     @(change.Kind == FileChangeKind.Added ? "Ny" : "Ändrad")
                 </span>
                 <strong style="font-size:13px">@change.Path</strong>
             </div>
+            <p class="diff-file__summary">@Summarize(change)</p>
 
             @if (change.Kind == FileChangeKind.Modified)
             {
                 <details>
-                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa före/efter</summary>
+                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa exakta rader (före/efter)</summary>
                     <div class="diff-columns">
                         <div>
                             <p style="font-size:11px;color:var(--color-text-muted)">Före</p>
@@ -43,7 +51,7 @@ else
             else
             {
                 <details>
-                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa innehåll</summary>
+                    <summary style="cursor:pointer;font-size:12px;color:var(--color-text-secondary)">Visa exakt innehåll</summary>
                     <pre>@change.NewContent</pre>
                 </details>
             }
@@ -53,6 +61,7 @@ else
 
 <style>
     .diff-file { margin-bottom: 10px; padding: 10px; }
+    .diff-file__summary { font-size: 12.5px; color: var(--color-text-secondary); margin: 0 0 6px; }
     .diff-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
     @@media (max-width: 560px) { .diff-columns { grid-template-columns: 1fr; } }
     pre { font-family: var(--font-mono); font-size: 11px; background: var(--color-surface-2); padding: 8px; border-radius: var(--radius-sm); max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
@@ -61,4 +70,167 @@ else
 @code {
     [Parameter, EditorRequired] public PackDraft Draft { get; set; } = default!;
     [Parameter, EditorRequired] public RemoteRepo Repo { get; set; } = default!;
+
+    /// <summary>
+    /// Bästa-ansträngning-sammanfattning av en enskild filändring, i
+    /// vardagsspråk. Faller alltid tillbaka på en generisk, sann text
+    /// ("Innehållet ändrades") om filen inte matchar något känt mönster —
+    /// aldrig ett undantag, aldrig tomt. Filsökvägarna som matchas mot
+    /// (pack.config.json, theme.css/theme-dark.css, activities.*.json,
+    /// translations.*.json) är exakt de PackDraft.ToFiles skriver — se den
+    /// metoden om nya filtyper läggs till där.
+    /// </summary>
+    private string Summarize(FileChange change)
+    {
+        var fileName = change.Path.Split('/')[^1];
+
+        if (fileName == "pack.config.json")
+            return SummarizeConfigChange(change);
+
+        if (fileName is "theme.css" or "theme-dark.css")
+        {
+            var mode = fileName == "theme.css" ? "ljust läge" : "mörkt läge";
+            return change.Kind == FileChangeKind.Added
+                ? $"Färgerna för {mode} sattes."
+                : $"Färgerna för {mode} ändrades.";
+        }
+
+        if (fileName.StartsWith("activities."))
+            return SummarizeActivitiesChange(change, fileName);
+
+        if (fileName.StartsWith("translations."))
+        {
+            var lang = fileName.Replace("translations.", "").Replace(".json", "");
+            return change.Kind == FileChangeKind.Added
+                ? $"Nya översättningstexter för språket \"{lang}\"."
+                : $"Översättningstexter för språket \"{lang}\" ändrades.";
+        }
+
+        // Okänt mönster — fortfarande sant, bara inte specifikt.
+        return change.Kind == FileChangeKind.Added ? "Ny fil." : "Innehållet ändrades.";
+    }
+
+    private static string SummarizeConfigChange(FileChange change)
+    {
+        if (change.Kind == FileChangeKind.Added)
+            return "Grundinställningarna för appen skapades.";
+
+        // Enkel, robust jämförelse: parsa båda som lösa JSON-dokument och
+        // jämför bara ett litet antal välkända, tydligt namngivna fält —
+        // INTE en fullständig strukturell diff (det vore i praktiken en
+        // omskrivning av den detaljerade vyn som redan finns bakom
+        // "Visa exakta rader", bara sämre). Faller tillbaka på en generisk
+        // text om parsningen av någon anledning misslyckas.
+        try
+        {
+            using var oldDoc = System.Text.Json.JsonDocument.Parse(change.OldContent ?? "{}");
+            using var newDoc = System.Text.Json.JsonDocument.Parse(change.NewContent);
+            var notes = new List<string>();
+
+            CompareStringField(oldDoc, newDoc, "appName", "App-namnet", notes);
+            CompareStringField(oldDoc, newDoc, "tagline", "Taglinen", notes);
+            CompareStringField(oldDoc, newDoc, "startView", "Startvyn", notes);
+
+            if (oldDoc.RootElement.TryGetProperty("categories", out var oldCats) && newDoc.RootElement.TryGetProperty("categories", out var newCats))
+            {
+                var diff = newCats.GetArrayLength() - oldCats.GetArrayLength();
+                if (diff > 0) notes.Add($"{diff} ny(a) kategori(er)");
+                else if (diff < 0) notes.Add($"{-diff} kategori(er) borttagen(a)");
+            }
+            if (oldDoc.RootElement.TryGetProperty("filters", out var oldFilters) && newDoc.RootElement.TryGetProperty("filters", out var newFilters))
+            {
+                var diff = newFilters.GetArrayLength() - oldFilters.GetArrayLength();
+                if (diff > 0) notes.Add($"{diff} nytt/nya filter");
+                else if (diff < 0) notes.Add($"{-diff} filter borttagna");
+            }
+
+            return notes.Count > 0
+                ? string.Join(", ", notes) + " ändrades."
+                : "Inställningar ändrades (i ett fält som inte sammanfattas här — se detaljerna nedan).";
+        }
+        catch
+        {
+            return "Inställningarna ändrades.";
+        }
+    }
+
+    private static void CompareStringField(System.Text.Json.JsonDocument oldDoc, System.Text.Json.JsonDocument newDoc, string field, string humanName, List<string> notes)
+    {
+        // .GetString() hanterar ValueKind.Null graciöst (returnerar null),
+        // men kastar för alla andra icke-sträng-typer — explicit koll här
+        // istället för att förlita sig på det, ifall ett äldre eller
+        // framtida schema-format skulle råka lagra fältet som något annat
+        // än en JSON-sträng.
+        static string? SafeGetString(System.Text.Json.JsonDocument doc, string field) =>
+            doc.RootElement.TryGetProperty(field, out var el) && el.ValueKind is System.Text.Json.JsonValueKind.String or System.Text.Json.JsonValueKind.Null
+                ? el.GetString()
+                : null;
+
+        var oldVal = SafeGetString(oldDoc, field);
+        var newVal = SafeGetString(newDoc, field);
+        if (oldVal != newVal)
+            notes.Add(humanName.ToLowerInvariant());
+    }
+
+    private static string SummarizeActivitiesChange(FileChange change, string fileName)
+    {
+        var lang = fileName.Replace("activities.", "").Replace(".json", "");
+
+        if (change.Kind == FileChangeKind.Added)
+        {
+            try
+            {
+                var added = System.Text.Json.JsonSerializer.Deserialize<List<Activity>>(change.NewContent)?.Count ?? 0;
+                return $"{added} aktivitet(er) skapade för språket \"{lang}\".";
+            }
+            catch { return $"Aktiviteter skapade för språket \"{lang}\"."; }
+        }
+
+        try
+        {
+            var oldList = System.Text.Json.JsonSerializer.Deserialize<List<Activity>>(change.OldContent ?? "[]") ?? new();
+            var newList = System.Text.Json.JsonSerializer.Deserialize<List<Activity>>(change.NewContent) ?? new();
+            var oldIds = oldList.Select(a => a.Id).ToHashSet();
+            var newIds = newList.Select(a => a.Id).ToHashSet();
+
+            var addedCount = newIds.Except(oldIds).Count();
+            var removedCount = oldIds.Except(newIds).Count();
+            // "Ändrad" jämförs bara på ett litet antal konkreta fält (Title/
+            // Description/Category), INTE en fullständig objektjämförelse
+            // (t.ex. via serialisering) — Activity har flera Dictionary-fält
+            // (FilterValues m.fl.) vars enumereringsordning inte är
+            // garanterat stabil mellan två separata serialiseringar, vilket
+            // hade kunnat ge falska "ändrad"-markeringar för aktiviteter som
+            // egentligen är oförändrade. Samma försiktighet som gäller för
+            // pack.config.json-jämförelsen ovan.
+            //
+            // GroupBy+First (inte ToDictionary) med flit: Activity.Id är ett
+            // fritt redigerbart textfält utan garanterad unikhet (se
+            // ActivityTable.AddActivity — "activity-{count+1}" kan kollidera
+            // efter en borttagning), så en dubblett ska tyst hanteras genom
+            // att ta första träffen, inte kasta och trigga hela metodens
+            // fallback-text i onödan.
+            var newById = newList.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First());
+            var changedCount = oldList
+                .Where(o => newIds.Contains(o.Id))
+                .Count(o =>
+                {
+                    var n = newById[o.Id];
+                    return o.Title != n.Title || o.Description != n.Description || o.Category != n.Category;
+                });
+
+            var parts = new List<string>();
+            if (addedCount > 0) parts.Add($"{addedCount} ny(a)");
+            if (removedCount > 0) parts.Add($"{removedCount} borttagen(a)");
+            if (changedCount > 0) parts.Add($"{changedCount} ändrad(e)");
+
+            return parts.Count > 0
+                ? $"Aktiviteter för \"{lang}\": " + string.Join(", ", parts) + "."
+                : $"Aktiviteter för \"{lang}\" ändrades (samma antal och id:n som innan).";
+        }
+        catch
+        {
+            return $"Aktiviteterna för språket \"{lang}\" ändrades.";
+        }
+    }
 }

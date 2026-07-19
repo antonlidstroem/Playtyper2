@@ -48,10 +48,14 @@
     else if (_bundle != null)
     {
         <div class="bundle-editor">
+            <p class="help-text">
+                En bundle är den färdiga, driftsatta appen — den bestämmer vilka av dina packs som faktiskt skeppas med, plus sånt som gäller HELA appen snarare än ett enskilt pack (namn i appbutiken, ett lösenord för hela appen, licensinformation).
+            </p>
+
             <h3>App-identitet</h3>
             <div class="field-grid">
                 <div>
-                    <label>App-id <span class="field-note">(ändra bara om du vet varför — kopplar ihop config med driftsättning)</span></label>
+                    <label>App-id <span class="field-note">(en teknisk identifierare — ändra bara om du vet varför, byte kan göra att befintliga installationer tappar kopplingen till sina sparade data)</span></label>
                     <input value="@GetStr("appId")" @onchange='e => SetStr("appId", e.Value?.ToString())' />
                 </div>
                 <div>
@@ -59,7 +63,7 @@
                     <input value="@GetStr("appName")" @onchange='e => SetStr("appName", e.Value?.ToString())' />
                 </div>
                 <div>
-                    <label>Standardpack</label>
+                    <label>Standardpack <span class="field-note">(vilket pack besökaren möter om appen bara innehåller ett, eller det som visas direkt)</span></label>
                     <select value="@GetStr("defaultPack")" @onchange='e => SetStr("defaultPack", e.Value?.ToString())'>
                         <option value="">– välj –</option>
                         @foreach (var id in _packIds)
@@ -69,7 +73,7 @@
                     </select>
                 </div>
                 <div>
-                    <label>Accentfärg</label>
+                    <label>Accentfärg <span class="field-note">(app-butikens ikon/beskrivning — separat från packens egna färger)</span></label>
                     <div style="display:flex;gap:8px;align-items:center">
                         <input type="color" value="@(GetStr("accentColor") is { Length: > 0 } c ? c : "#E8845A")" @onchange='e => SetStr("accentColor", e.Value?.ToString())' style="width:44px;padding:2px" />
                         <input value="@GetStr("accentColor")" @onchange='e => SetStr("accentColor", e.Value?.ToString())' placeholder="#E8845A" style="flex:1" />
@@ -78,6 +82,7 @@
             </div>
 
             <h3 style="margin-top:24px">Butiksbeskrivning</h3>
+            <p class="section-hint">Texten som visas i Google Play/App Store, om appen publiceras där.</p>
             <div class="field-grid">
                 <div>
                     <label>Svenska</label>
@@ -106,7 +111,7 @@
             }
 
             <h3 style="margin-top:24px">Bundle-lösenord</h3>
-            <p class="section-hint">Visas före pack-väljaren (eller före det enda packet, i enpacks-bundlar) — separat från ett enskilt packs eget lösenord under Backend &amp; inloggning.</p>
+            <p class="section-hint">Ett lösenord för HELA appen, oavsett vilket pack besökaren sedan öppnar — visas innan pack-väljaren (eller innan det enda packet, i enpacks-bundlar). Separat från ett enskilt packs eget lösenord (satt under Backend &amp; inloggning på det packet).</p>
             <label class="toggle-row">
                 <input type="checkbox" checked="@GetAuthEnabled()" @onchange="ToggleBundleAuth" />
                 Kräv lösenord innan bundlen öppnas
@@ -115,29 +120,42 @@
             {
                 <div class="field-grid" style="margin-top:8px">
                     <div>
-                        <label>Nytt lösenord <span class="field-note">(hashas direkt)</span></label>
+                        <label>Nytt lösenord</label>
                         <input type="password" @bind="_newBundlePassword" @bind:event="oninput" @bind:after="ApplyBundlePassword" />
+                        <span class="field-note">Lösenordet skrivs aldrig till GitHub i klartext — det omvandlas direkt till en kod ("hash") som går att kontrollera mot, men inte gå baklänges ifrån.</span>
                     </div>
                     <div>
                         <label>Sessionslängd (timmar)</label>
                         <input type="number" min="1" value="@GetAuthInt("sessionHours", 24)" @onchange='e => SetAuthInt("sessionHours", e.Value?.ToString())' />
                     </div>
                     <div style="grid-column:1/-1">
-                        <label>Ledtråd <span class="field-note">(klartext — visas innan pack:ets eget språk är känt)</span></label>
+                        <label>Ledtråd <span class="field-note">(visas i klartext, eftersom det sker innan appen vet vilket språk besökaren vill ha)</span></label>
                         <input value="@GetAuthStr("hint")" @onchange='e => SetAuthStr("hint", e.Value?.ToString())' />
                     </div>
                 </div>
-                <p class="field-note" style="margin-top:6px">Nuvarande hash: <code>@(string.IsNullOrEmpty(GetAuthStr("passwordHash")) ? "(inget satt än)" : GetAuthStr("passwordHash"))</code></p>
+                <p class="field-note" style="margin-top:6px">
+                    @if (string.IsNullOrEmpty(GetAuthStr("passwordHash")))
+                    {
+                        <text>Inget lösenord satt än — bundlen är i praktiken olåst tills du anger ett ovan.</text>
+                    }
+                    else
+                    {
+                        <text>Ett lösenord är satt. Den lagrade koden (inte lösenordet självt): <code>@GetAuthStr("passwordHash")</code></text>
+                    }
+                </p>
             }
 
             <h3 style="margin-top:24px">Licens</h3>
+            <p class="section-hint">
+                Om appen kräver en giltig licens för att fungera (vanligt för betalande kunder) — kopplar den här bundlen till en licens som redan finns skapad på licensservern.
+            </p>
             <div class="field-grid">
                 <div>
                     <label>Licens-id</label>
                     <input value="@BundleRepository.GetLicenseId(_bundle)" @onchange="e => { if (!string.IsNullOrWhiteSpace(e.Value?.ToString())) BundleRepository.SetLicenseId(_bundle, e.Value!.ToString()!); }" />
                 </div>
                 <div>
-                    <label>Licensserver-URL <span class="field-note">(valfri — annars license.playtypus.se)</span></label>
+                    <label>Licensserver-URL <span class="field-note">(valfri — annars används standardservern license.playtypus.se)</span></label>
                     <input value="@BundleRepository.GetLicenseServerUrl(_bundle)" @onchange="e => BundleRepository.SetLicenseServerUrl(_bundle, e.Value?.ToString())" placeholder="https://..." />
                 </div>
             </div>
@@ -168,10 +186,10 @@
                     }
 
                     <details style="margin-top:12px">
-                        <summary style="cursor:pointer;font-size:13px;color:var(--color-text-secondary)">Admin-åtgärder (förnya / återkalla)</summary>
+                        <summary style="cursor:pointer;font-size:13px;color:var(--color-text-secondary)">Admin-åtgärder (förnya eller återkalla licensen)</summary>
                         <div class="field-grid" style="margin-top:8px">
                             <div style="grid-column:1/-1">
-                                <label>Admin-nyckel <span class="field-note">(bara i minnet den här sessionen, sparas aldrig)</span></label>
+                                <label>Admin-nyckel <span class="field-note">(en separat, hemlig nyckel för licensservern — inte samma sak som ditt GitHub-token. Sparas aldrig, bara i minnet den här sessionen)</span></label>
                                 <input type="password" @bind="_adminKey" @bind:event="oninput" placeholder="X-Admin-Key" />
                             </div>
                             <div>
@@ -183,6 +201,7 @@
                             <button class="ghost" @onclick="RenewLicenseAsync" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Förnya @_renewYears år</button>
                             <button class="ghost" style="color:var(--color-danger-text)" @onclick="() => _confirmRevoke = true" disabled="@(_licenseBusy || string.IsNullOrWhiteSpace(_adminKey))">Återkalla licens</button>
                         </div>
+                        <p class="field-note" style="margin-top:4px">Förnya skjuter fram licensens utgångsdatum. Återkalla gör licensen ogiltig omedelbart — appen slutar då fungera för den kunden tills en ny licens kopplas in.</p>
                         @if (_confirmRevoke)
                         {
                             <div class="field-grid" style="margin-top:8px">
@@ -200,7 +219,7 @@
                 </div>
             }
             <p class="field-note" style="margin-top:8px">
-                Skapa en HELT NY licens görs fortfarande via PackWizards Licenshantering (kräver mer kringinfo — kundnamn, pris, e-post — än vad den här sidan samlar in).
+                Den här sidan kan koppla en bundle till en licens som redan finns — men kan inte skapa en helt NY licens från grunden (det kräver mer information än vad Playtyper samlar in, som kundnamn, pris och e-post). Kontakta den som administrerar licensservern för det.
             </p>
 
             @if (_error != null)

@@ -21,7 +21,8 @@ else if (_draft != null)
     <AppShell Title="@_draft.PackId" RepoName="@(State.Repo?.OwnerRepo ?? "")"
               IsDirty="@_isDirty" Saving="@(_saving || _validating)"
               OnSave="SaveAsync" OnShowDiff="() => _showDiff = true"
-              Tabs="_tabs" ActiveTab="@_activeTab" OnTabChanged="tab => _activeTab = tab">
+              Tabs="_tabs" ActiveTab="@_activeTab" OnTabChanged="tab => _activeTab = tab"
+              TabStatus="_tabStatus">
         <ChildContent>
             @switch (_activeTab)
             {
@@ -154,6 +155,7 @@ else if (_draft != null)
 
     private Validator.ValidationResult? _pendingValidation;
     private bool _validating;
+    private Dictionary<string, bool?> _tabStatus = new();
 
     private bool _recoveredDraftPrompt;
     private DateTimeOffset? _recoveredAt;
@@ -183,6 +185,7 @@ else if (_draft != null)
         try
         {
             _draft = await PackDraftStore.LoadAsync(State.Repo, PackId);
+            _tabStatus = TabCompletion.Compute(_draft);
         }
         catch (Exception ex)
         {
@@ -206,6 +209,7 @@ else if (_draft != null)
     private void OnDraftChanged()
     {
         _isDirty = _draft!.IsDirty(State.Repo!);
+        _tabStatus = TabCompletion.Compute(_draft);
         _ = PersistToCacheAsync();
         StateHasChanged();
     }

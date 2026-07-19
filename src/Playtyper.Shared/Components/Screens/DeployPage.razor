@@ -162,12 +162,12 @@
                             <div>
                                 <label><code>CLOUDFLARE_API_TOKEN</code></label>
                                 <input type="password" @bind="_wfCloudflareApiToken" autocomplete="off" />
-                                <span class="field-note">Skapas i Cloudflare-kontot: Profil → API Tokens → Create Token.</span>
+                                <span class="field-note">Skapas i Cloudflare-kontot: Profil → API Tokens → Create Token. Behöver behörigheten "Cloudflare Pages: Edit". Används både som secret här OCH av Playtyper direkt för att skapa Cloudflare Pages-projektet nedan om det inte redan finns — lämna inte tomt vid en första driftsättning.</span>
                             </div>
                             <div>
                                 <label><code>CLOUDFLARE_ACCOUNT_ID</code></label>
                                 <input type="password" @bind="_wfCloudflareAccountId" autocomplete="off" />
-                                <span class="field-note">Finns på Cloudflare-kontots översiktssida, högerspalten.</span>
+                                <span class="field-note">Finns på Cloudflare-kontots översiktssida, högerspalten. Behövs tillsammans med token ovan för att skapa Pages-projektet.</span>
                             </div>
                         }
                         @if (_wfDeployAndroid)
@@ -206,6 +206,30 @@
                     @if (!CanSaveWorkflow)
                     {
                         <p style="font-size:12px;color:var(--color-text-muted)">Fyll i ramverksrepo, ref@(_wfDeployWeb ? " och Cloudflare-projektnamn" : "") för att fortsätta.</p>
+                    }
+                }
+
+                @if (_cloudflareProjectResult != null)
+                {
+                    @if (_cloudflareProjectResult.Success)
+                    {
+                        <div class="deploy-result deploy-result--ok">
+                            <p>
+                                ✓ Cloudflare Pages-projektet <code>@_wfCloudflareProject</code>
+                                @(_cloudflareProjectResult.AlreadyExisted ? "fanns redan." : "skapades nu.")
+                                @if (_cloudflareProjectResult.LiveUrl != null)
+                                {
+                                    <span> Kommer bli tillgängligt på <a href="@_cloudflareProjectResult.LiveUrl" target="_blank">@_cloudflareProjectResult.LiveUrl</a> så fort första driftsättningen är klar.</span>
+                                }
+                            </p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="deploy-result deploy-result--error">
+                            <p>✗ Kunde inte skapa Cloudflare Pages-projektet: @_cloudflareProjectResult.Error</p>
+                            <p class="field-note">Kontrollera att Cloudflare-token har behörigheten "Cloudflare Pages: Edit" och att konto-id:t stämmer. Workflow-filen sparades inte — rätta ovan och försök igen.</p>
+                        </div>
                     }
                 }
 
@@ -330,6 +354,7 @@
     private string _wfAndroidKeystorePassword = "";
     private bool _savingWorkflow;
     private GitHubOperator.DeployWorkflowResult? _workflowResult;
+    private CloudflareApiService.ProjectResult? _cloudflareProjectResult;
 
     private bool CanSaveWorkflow =>
         (_wfDeployWeb || _wfDeployAndroid) &&
@@ -393,7 +418,40 @@
     {
         _savingWorkflow = true;
         _workflowResult = null;
+        _cloudflareProjectResult = null;
         StateHasChanged();
+
+        // Skapa Cloudflare Pages-projektet FÖRE workflow-filen sparas, inte
+        // efter — annars kan en person spara konfigurationen, tro att allt
+        // är klart, och först vid taggskapandet (ett helt annat steg,
+        // ibland dagar senare) upptäcka att "Project not found" (kod
+        // 8000007). EnsureProjectAsync kollar själv om projektet redan
+        // finns innan den försöker skapa ett nytt, så detta är ofarligt
+        // att köra om vid varje sparning — se metodens egen kommentar.
+        //
+        // Körs bara om ett token/konto-id faktiskt skrevs in i DET HÄR
+        // sparandet: fälten kan vara tomt lämnade med avsikt (UI:t tillåter
+        // att man uppdaterar t.ex. bara Playtypus-repot och lämnar redan
+        // satta Cloudflare-secrets orörda, se NullIfBlank-mönstret nedan)
+        // — då finns ingen nyckel i sidans minne att skapa projektet med,
+        // och det är inte ett fel: projektet skapades i så fall redan
+        // förra gången de här fälten faktiskt fylldes i.
+        if (_wfDeployWeb && !string.IsNullOrWhiteSpace(_wfCloudflareApiToken) && !string.IsNullOrWhiteSpace(_wfCloudflareAccountId) && !string.IsNullOrWhiteSpace(_wfCloudflareProject))
+        {
+            _cloudflareProjectResult = await CloudflareApiService.EnsureProjectAsync(
+                _wfCloudflareApiToken.Trim(), _wfCloudflareAccountId.Trim(), _wfCloudflareProject.Trim());
+
+            if (!_cloudflareProjectResult.Success)
+            {
+                // Stanna här — spara inte workflow-filen om vi vet att
+                // projektet den pekar på inte gick att skapa. Bättre att
+                // personen rättar Cloudflare-token/konto-id direkt än att
+                // upptäcka samma "Project not found" vid taggskapandet.
+                _savingWorkflow = false;
+                StateHasChanged();
+                return;
+            }
+        }
 
         var config = new GitHubOperator.DeployWorkflowConfig(
             _wfDeployWeb, _wfDeployAndroid,
