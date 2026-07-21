@@ -33,10 +33,35 @@
     switch specifically — see the separate note below about
     Playtypus.Core.Models for the one file that DID change, for an
     unrelated reason.)
+
+    ⚠ v18 (2026-07): AppearanceEditor.razor in this project now references
+    UiConfig.HeaderImage and UiConfig.CategoryNavPosition, added to
+    Playtypus.Core in the SAME change as this comment. Those two members do
+    NOT exist in the "1.0.1" package below — this repo's build WILL fail
+    with CS1061 ("does not contain a definition for...") until a
+    Playtypus.Core build that includes them is actually published and the
+    Version below is bumped to match. Left at "1.0.1" here deliberately
+    rather than bumped to a guessed-at next version, because a version
+    number that doesn't exist on the feed yet turns a clear compile error
+    into a more opaque NuGet-restore failure instead — not an improvement.
+    Two ways to unblock, your call which:
+      1. FOR LOCAL TESTING RIGHT NOW: comment out the PackageReference line
+         below and uncomment the ProjectReference beneath it (fix the
+         relative path first — it assumes Playtypus-UIRefact is checked out
+         as a sibling folder to this repo; adjust if yours isn't). Switch
+         back before committing — this bypasses the whole point of pinning
+         a published version, so it's a local-only workaround, not a fix.
+      2. FOR REAL: push the Playtypus.Core changes to that repo's main
+         branch, let publish-nuget.yml publish the new version, then bump
+         Version below to match it (suggested next version: "1.1.0" —
+         additive/optional fields only, nothing existing changed shape, so
+         a minor bump reads right — but that's this repo's versioning call
+         to make, not mine).
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
     <PackageReference Include="Playtypus.Core" Version="1.0.1" />
+    <!-- <ProjectReference Include="..\..\..\Playtypus-UIRefact\src\Playtypus.Core\Playtypus.Core.csproj" /> -->
   </ItemGroup>
 
   <!--

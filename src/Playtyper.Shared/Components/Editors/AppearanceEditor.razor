@@ -214,7 +214,7 @@
             {
                 <div>
                     <label>Var kategoriflikarna visas</label>
-                    <select value="@(ui.CategoryNavPosition ?? "drawer")" @onchange="e => { ui.CategoryNavPosition = e.Value?.ToString() == "pinned" ? "pinned" : null; Notify(); }">
+                    <select value="@(ui.CategoryNavPosition ?? "drawer")" @onchange="e => SetCategoryNavPosition(ui, e.Value?.ToString())">
                         @foreach (var option in LayoutStyleManifest.CategoryNavPositions)
                         {
                             <option value="@option.Value">@option.Label</option>
@@ -287,6 +287,20 @@
         if (on && !list.Contains(mode)) list.Add(mode);
         else if (!on) list.Remove(mode);
         ui.AvailableLayouts = list.Count > 0 ? list : null;
+        Notify();
+    }
+
+    // v18 bugfix: this used to be an inline @onchange lambda directly in the
+    // markup, with "pinned" as a nested string literal inside the (bare,
+    // non-@()-wrapped) attribute value. Razor's attribute-value parser
+    // terminates at the first quote character it meets, so it read the
+    // attribute as ending right before "pinned" and treated the rest as
+    // stray markup — a real compile error (CS1002/CS1525/CS1513), found via
+    // an actual build, not something my own review process would have
+    // caught. As a plain method there is no quote for the parser to trip on.
+    private void SetCategoryNavPosition(UiConfig ui, string? value)
+    {
+        ui.CategoryNavPosition = value == "pinned" ? "pinned" : null;
         Notify();
     }
 
