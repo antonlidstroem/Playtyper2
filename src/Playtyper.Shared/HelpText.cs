@@ -99,7 +99,12 @@ public static class HelpText
         ["backends"] = new(
             "Backend & inloggning",
             "Om appen ska hämta eller spara data från en extern källa, och om besökare behöver logga in.",
-            "\"Backend\" är den tekniska termen för en server någon annanstans som appen pratar med — till exempel för att spara favoriter mellan enheter. De flesta enklare appar klarar sig utan och kan hoppa över den här fliken helt."),
+            "\"Backend\" är den tekniska termen för en server någon annanstans som appen pratar med — till exempel för att spara favoriter mellan enheter. De flesta enklare appar klarar sig utan och kan hoppa över den här fliken helt.\n\n" +
+            "Den här fliken har TVÅ helt olika sorters lösenord — lätt att blanda ihop, så här är skillnaden:\n\n" +
+            "• Lösenordet du sätter här under \"Lösenord\"/\"Admin-lösenord\" är en DELAD RIDÅ. Det finns ingen server inblandad — hashen sparas rakt i pack.config.json, och vem som helst med lite teknisk kunskap kan läsa den. Bra för \"inte vem som helst ska snubbla in av misstag\", inte en riktig säkerhetsspärr. Alla besökare delar samma lösenord.\n\n" +
+            "• Om du istället sätter \"Inloggningskrav\" till \"Besökarens egen inloggning krävs\" pratar appen med en RIKTIG server (Playtypus.Server) som håller reda på enskilda användarkonton med e-post och eget lösenord per person — helt separat mekanism, mycket starkare, men kräver att en backend faktiskt är kopplad.\n\n" +
+            "• \"En delad nyckel\" är ett tredje läge: en enda hemlig nyckel (inte ett lösenord en person skriver in) som hela appen använder för att prata med servern — besökaren märker inget av den alls.\n\n" +
+            "Inget av detta har något med ditt eget GitHub-lösenord/token att göra (det du loggar in med här i Playtyper) — det är en fjärde, helt separat sak som aldrig följer med i appen du bygger."),
 
         ["advanced"] = new(
             "Avancerat",
@@ -286,16 +291,15 @@ public static class HelpText
             "En avskalad startsida med bara det viktigaste — tänkt för akuta eller stressade situationer där besökaren inte ska behöva leta."),
     };
 
-    // ── Header-stil (AppearanceEditor) ──────────────────────────────────
-
-    public sealed record HeaderStyleOption(string Value, string Label, string Description);
-
-    public static readonly IReadOnlyList<HeaderStyleOption> HeaderStyleOptions = new List<HeaderStyleOption>
-    {
-        new("solid", "Enfärgad", "Sidhuvudet har en egen, tydlig bakgrundsfärg."),
-        new("surface", "Följer ytan", "Sidhuvudet smälter in i bakgrunden bakom det, ingen tydlig gräns."),
-        new("transparent", "Genomskinligt", "Sidhuvudet syns bara som text/ikoner ovanpå innehållet, ingen egen bakgrund alls."),
-    };
+    // ── Header-/kort-/rutnäts-/detaljstil (AppearanceEditor) ─────────────
+    // v18: moved to LayoutStyleManifest.cs — that file is now the single
+    // source for these option lists (previously HeaderStyleOptions lived
+    // here with a stale value, "solid", that ui-variants.css never
+    // actually listened for; see LayoutStyleManifest's header comment for
+    // the full story). CardStyle/GridStyle/DetailStyle never had option
+    // lists anywhere before v18 at all — CardStyle was a bare text input,
+    // Grid/DetailStyle had dropdowns with invented values not backed by
+    // any CSS. All four now live in LayoutStyleManifest instead.
 
     // ── Färgvariabler (TokenEditor) ──────────────────────────────────────
 

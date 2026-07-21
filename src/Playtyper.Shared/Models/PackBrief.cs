@@ -25,6 +25,20 @@ public sealed class PackBrief
     public string FontPreset     { get; set; } = "rounded";
     public int    BaseFontSize   { get; set; } = 16;
 
+    // ── v18: app-type archetype ──────────────────────────────────────────────
+    /// <summary>
+    /// Id of the FeatureManifest.AppTypePresets entry chosen in
+    /// CreatePackPage's app-type picker, e.g. "places-outdoor" or "recipes".
+    /// Null/empty when no preset was picked (freeform/quick-mode packs, or
+    /// anyone who skips the picker) — PromptGenerator falls back to its
+    /// existing generic preset-matching prose in that case, unchanged from
+    /// before v18. When set, PromptGenerator instead puts that one preset's
+    /// suggested features/ui combo front and centre near the top of the
+    /// prompt instead of leaving the AI to find it in the full reference
+    /// table further down.
+    /// </summary>
+    public string? AppTypePresetId { get; set; }
+
     // ── Languages ─────────────────────────────────────────────────────────────
     public string        DefaultLanguage { get; set; } = "sv";
     public List<LangDef> Languages       { get; set; } = new();

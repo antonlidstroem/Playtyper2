@@ -121,8 +121,11 @@
                 <div class="field-grid" style="margin-top:8px">
                     <div>
                         <label>Nytt lösenord</label>
-                        <input type="password" @bind="_newBundlePassword" @bind:event="oninput" @bind:after="ApplyBundlePassword" />
-                        <span class="field-note">Lösenordet skrivs aldrig till GitHub i klartext — det omvandlas direkt till en kod ("hash") som går att kontrollera mot, men inte gå baklänges ifrån.</span>
+                        <div class="password-apply-row">
+                            <input type="password" @bind="_newBundlePassword" @bind:event="oninput" @onkeydown="HandleBundlePasswordKeydown" />
+                            <button type="button" class="ghost" disabled="@string.IsNullOrEmpty(_newBundlePassword)" @onclick="ApplyBundlePassword">Använd</button>
+                        </div>
+                        <span class="field-note">Skriv klart hela lösenordet och tryck sedan på "Använd" (eller Enter). Lösenordet skrivs aldrig till GitHub i klartext — det omvandlas direkt till en kod ("hash") som går att kontrollera mot, men inte gå baklänges ifrån.</span>
                     </div>
                     <div>
                         <label>Sessionslängd (timmar)</label>
@@ -246,6 +249,9 @@
     .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 6px; }
     .pack-checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
     code { font-size: 11px; word-break: break-all; background: var(--color-surface-2); padding: 2px 5px; border-radius: 4px; }
+    .password-apply-row { display: flex; gap: 6px; align-items: center; }
+    .password-apply-row input { flex: 1; margin: 0; }
+    .password-apply-row button { flex-shrink: 0; white-space: nowrap; }
     @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
 </style>
 
@@ -354,6 +360,15 @@
         if (_bundle == null || string.IsNullOrEmpty(_newBundlePassword)) return;
         EnsureAuth()["passwordHash"] = Sha256Hex(_newBundlePassword);
         _newBundlePassword = "";
+    }
+
+    // v18 bugfix: same root cause as BackendsEditor.razor's password fields
+    // (this one was copied from that one) — used to auto-apply-and-clear on
+    // every keystroke via @bind:after, so a multi-character password could
+    // never be entered reliably. Now only commits on explicit "Använd" or Enter.
+    private void HandleBundlePasswordKeydown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ApplyBundlePassword();
     }
 
     private static string Sha256Hex(string input)

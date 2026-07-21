@@ -115,60 +115,116 @@
     </label>
     @if (Draft.Config.Ui is { } ui)
     {
+        <p class="section-hint" style="margin-top:8px">
+            Alla val nedan är rena stilval — appens motor (Playtypus) stödjer redan alla värdena i varje lista.
+            Testa gärna en kombination du inte skulle valt automatiskt; det är precis vad de här fälten är till för.
+        </p>
         <div class="field-grid" style="margin-top:8px">
             <div>
                 <label>Sidhuvudets stil</label>
                 <select @bind="ui.HeaderStyle" @bind:after="Notify">
-                    @foreach (var option in HelpText.HeaderStyleOptions)
+                    @foreach (var option in LayoutStyleManifest.HeaderStyles)
                     {
                         <option value="@option.Value">@option.Label</option>
                     }
                 </select>
                 <p class="field-note" style="margin-top:4px">
-                    @(HelpText.HeaderStyleOptions.FirstOrDefault(o => o.Value == ui.HeaderStyle)?.Description)
+                    @(LayoutStyleManifest.HeaderStyles.FirstOrDefault(o => o.Value == ui.HeaderStyle)?.Description)
                 </p>
             </div>
+            @if (ui.HeaderStyle == "image")
+            {
+                <div>
+                    <label>Sidhuvudsbild <span class="field-note">(URL eller pack-relativ sökväg)</span></label>
+                    <input @bind="ui.HeaderImage" @bind:event="oninput" @bind:after="Notify" placeholder="images/header.jpg" />
+                </div>
+            }
             <div>
                 <label>Kort-stil</label>
-                <input @bind="ui.CardStyle" @bind:event="oninput" @bind:after="Notify" placeholder="default" />
+                <select @bind="ui.CardStyle" @bind:after="Notify">
+                    @foreach (var option in LayoutStyleManifest.CardStyles)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+                <p class="field-note" style="margin-top:4px">
+                    @(LayoutStyleManifest.CardStyles.FirstOrDefault(o => o.Value == ui.CardStyle)?.Description)
+                </p>
             </div>
             <div>
                 <label>Rutnäts-stil <span class="field-note">(hur korten placeras i listan)</span></label>
                 <select @bind="ui.GridStyle" @bind:after="Notify">
-                    <option value="single">Enkel rad — alla kort lika breda</option>
-                    <option value="masonry">Mosaik — olika höjd, tätt packat som Pinterest</option>
+                    @foreach (var option in LayoutStyleManifest.GridStyles)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
+                <p class="field-note" style="margin-top:4px">
+                    @(LayoutStyleManifest.GridStyles.FirstOrDefault(o => o.Value == ui.GridStyle)?.Description)
+                </p>
             </div>
             <div>
                 <label>Detaljvy-stil <span class="field-note">(hur en aktivitet öppnas)</span></label>
                 <select @bind="ui.DetailStyle" @bind:after="Notify">
-                    <option value="sheet">Panel som glider upp underifrån</option>
-                    <option value="page">Egen sida, hela skärmen</option>
+                    @foreach (var option in LayoutStyleManifest.DetailStyles)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
+                <p class="field-note" style="margin-top:4px">
+                    @(LayoutStyleManifest.DetailStyles.FirstOrDefault(o => o.Value == ui.DetailStyle)?.Description)
+                    På bredare skärmar (≥900px) visas detaljvyn alltid som en fast panel bredvid listan istället — det gäller oavsett vad som väljs här och behöver inget eget val.
+                </p>
             </div>
             <div>
                 <label>Densitet (listvy) <span class="field-note">(hur tätt raderna packas)</span></label>
                 <select @bind="ui.Density" @bind:after="Notify">
-                    <option value="comfortable">Luftig — bäst läsbarhet (~64px per rad)</option>
-                    <option value="compact">Kompakt — fler rader synliga (~44px)</option>
-                    <option value="minimal">Minimal — så mycket som möjligt på skärmen (~34px)</option>
+                    @foreach (var option in LayoutStyleManifest.DensityOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
             </div>
             <div>
-                <label>Tidslinje grupperas per</label>
+                <label>Tidslinje grupperas per <span class="field-note">(bara relevant i tidslinje-vy)</span></label>
                 <select @bind="ui.TimelineGrouping" @bind:after="Notify">
-                    <option value="week">vecka</option>
-                    <option value="month">månad</option>
-                    <option value="year">år</option>
+                    @foreach (var option in LayoutStyleManifest.TimelineGroupingOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
             </div>
             <div>
-                <label>Startskärm <span class="field-note">(bara relevant om Startskärm är "dashboard" i Innehåll-fliken)</span></label>
+                <label>Startskärm</label>
                 <select @bind="ui.HomeLayout" @bind:after="Notify">
-                    <option value="feed">Flöde — en löpande lista av aktiviteter</option>
-                    <option value="dashboard">Översikt — snabbknappar och kategori-kakel</option>
+                    @foreach (var option in LayoutStyleManifest.HomeLayouts)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </select>
+                <p class="field-note" style="margin-top:4px">
+                    @(LayoutStyleManifest.HomeLayouts.FirstOrDefault(o => o.Value == ui.HomeLayout)?.Description)
+                    @if (ui.HomeLayout is "dashboard" or "map" or "today" or "magazine" or "search" or "sections")
+                    {
+                        <text> Kom ihåg att också fylla i innehållet den här startskärmen bygger på (t.ex. QuickActions för "Instrumentpanel", repeat-fält för "Idag") på Innehåll-fliken — annars faller den tillbaka till en enkel variant.</text>
+                    }
+                </p>
             </div>
+            @if (Draft.Config.Features.CategoryTabs)
+            {
+                <div>
+                    <label>Var kategoriflikarna visas</label>
+                    <select value="@(ui.CategoryNavPosition ?? "drawer")" @onchange="e => { ui.CategoryNavPosition = e.Value?.ToString() == "pinned" ? "pinned" : null; Notify(); }">
+                        @foreach (var option in LayoutStyleManifest.CategoryNavPositions)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                    <p class="field-note" style="margin-top:4px">
+                        @(LayoutStyleManifest.CategoryNavPositions.FirstOrDefault(o => o.Value == (ui.CategoryNavPosition ?? "drawer"))?.Description)
+                    </p>
+                </div>
+            }
         </div>
         <label class="field-note" style="display:block;margin-top:10px">Vilka vyer besökaren kan växla mellan <span class="field-note">(lämna alla avbockade så används standard: kort + lista)</span></label>
         <div class="layout-checks">

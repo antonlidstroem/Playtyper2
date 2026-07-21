@@ -108,6 +108,13 @@
                 <div><label>Kategori</label><input @bind="_selected.Category" @bind:event="oninput" @bind:after="Notify" /></div>
                 <div><label>Nivå (1-3)</label><input type="number" min="0" max="3" @bind="_selected.Level" @bind:event="oninput" @bind:after="Notify" /></div>
                 <div><label>Förberedelsetid (min)</label><input type="number" @bind="_selected.PrepTimeMinutes" @bind:event="oninput" @bind:after="Notify" /></div>
+                <div><label>Layout-hint <span style="color:var(--color-text-muted)">(bara i mosaik-läge)</span></label>
+                    <select value="@(_selected.LayoutHint ?? "")" @onchange="e => { _selected.LayoutHint = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value.ToString(); Notify(); }">
+                        <option value="">(standard)</option>
+                        <option value="featured">Framhävd — större ruta</option>
+                        <option value="compact">Kompakt — mindre ruta</option>
+                    </select>
+                </div>
                 <div><label>Kräver rekvisita <span style="color:var(--color-text-muted)">(saker/material besökaren behöver ha till hands)</span></label>
                     <select @bind="_selected.RequiresProps" @bind:after="Notify">
                         <option value="false">Nej</option>

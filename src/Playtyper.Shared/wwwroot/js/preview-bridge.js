@@ -80,7 +80,7 @@ window.playtyperPreviewBridge = {
         var head = document.head;
 
         ['ui.css', 'ui-variants.css', 'detail-zones.css', 'mosaic.css', 'gallery.css',
-         'feel.css', 'premium.css', 'premium-desktop.css', 'v14-additions.css']
+         'feel.css', 'premium.css', 'premium-desktop.css', 'v14-additions.css', 'v18-additions.css']
             .forEach(function (f) {
                 var link = document.createElement('link');
                 link.rel = 'stylesheet';

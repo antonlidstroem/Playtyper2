@@ -259,16 +259,27 @@ public static class Validator
             }
         }
 
-        // ── ui.homeLayout (v14) ─────────────────────────────────────────────────
+        // ── ui.homeLayout (v14, extended v18) ───────────────────────────────────
         var homeLayout = config["ui"]?["homeLayout"]?.GetValue<string>();
-        if (homeLayout != null && homeLayout != "feed" && homeLayout != "dashboard")
+        var validHomeLayouts = new[] { "feed", "dashboard", "map", "today", "magazine", "search", "sections" };
+        if (homeLayout != null && !validHomeLayouts.Contains(homeLayout))
             warnings.Add($"ui.homeLayout='{homeLayout}' är okänt för AppShell.razor (giltiga värden: " +
-                         "\"feed\", \"dashboard\") — behandlas som \"feed\".");
+                         string.Join(", ", validHomeLayouts.Select(v => $"\"{v}\"")) + ") — behandlas som \"feed\".");
         var hasQuickActions = (config["quickActions"] as JsonArray)?.Count > 0;
         if (homeLayout == "dashboard" && !hasQuickActions && !declaredCategories.Any())
             warnings.Add("ui.homeLayout='dashboard' men varken quickActions eller categories är satta — " +
                          "dashboarden renderas tom. (Fortsätter fungera: \"Bläddra allt\" visar den vanliga " +
                          "listan precis som idag.)");
+        if (homeLayout == "sections" && declaredCategories.Count < 2)
+            warnings.Add("ui.homeLayout='sections' men färre än två categories är satta — " +
+                         "sektions-vyn bygger på en hylla per kategori och ger lite mening med bara en. " +
+                         "(Fortsätter fungera: renderas som en enda hylla plus ev. \"Övrigt\".)");
+        // Not checked here (would need activities.*.json, only loaded further
+        // down in this method): whether "map" has any activities with a map
+        // content block, or "today" has any with `repeat` set. Both degrade
+        // to a friendly in-app empty state rather than an error either way —
+        // see MapHomeView.razor / TodayHomeView.razor — so this is a nice-to-
+        // have warning, not a correctness gap, if someone wants to add it later.
 
         // ── readyNow: krävs om features.readyNowSection är true ────────────────
         // ReadyNowSection.razor renderar sektionen bara om Config.ReadyNow != null.

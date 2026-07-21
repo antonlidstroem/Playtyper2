@@ -131,6 +131,7 @@ Exakt tre kodblock i exakt den ordningen — inget annat.
         sb.AppendLine();
         WriteSourceMaterials(sb, b);
         WriteFreeformSection(sb, b);
+        WriteAppTypeCallout(sb, b);
         WriteIdentitySection(sb, b);
         WriteThemeSection(sb, b);
         WriteStructureSection(sb, b);
@@ -169,6 +170,39 @@ Exakt tre kodblock i exakt den ordningen — inget annat.
 """);
         sb.AppendLine();
         sb.AppendLine(b.FreeformNotes.Trim());
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+    }
+
+    /// <summary>
+    /// v18 — When the person picked an app-type card in CreatePackPage
+    /// (Draft.Config-adjacent, not a schema field — see PackBrief.AppTypePresetId),
+    /// put that ONE preset's feature+layout suggestion directly here, near the
+    /// top of the prompt, instead of leaving it as one row among eight in the
+    /// full AppTypePresets reference table further down (still rendered in
+    /// full via FeatureManifest.RenderAppTypePresets, for anyone who wants to
+    /// deviate or blend two). No-op when no preset was picked — e.g. Quick
+    /// mode, or anyone who skipped the picker — so this only affects the
+    /// prompt when it has something concrete to say.
+    /// </summary>
+    private static void WriteAppTypeCallout(StringBuilder sb, PackBrief b)
+    {
+        if (string.IsNullOrWhiteSpace(b.AppTypePresetId)) return;
+
+        var preset = FeatureManifest.AppTypePresets.FirstOrDefault(p => p.Id == b.AppTypePresetId);
+        if (preset == null) return; // stale/unknown id — fail quiet, the full table below still has everything
+
+        sb.AppendLine("## VALD APP-TYP (från app-typ-väljaren)");
+        sb.AppendLine();
+        sb.AppendLine($"> Användaren valde **{preset.Emoji} {preset.Name}** i app-typ-väljaren. Använd det som");
+        sb.AppendLine("> utgångspunkt för feature- och layoutval nedan — avvik gärna där brief:en eller");
+        sb.AppendLine("> fritextbeskrivningen ovan uttryckligen säger något annat, men annars är det här");
+        sb.AppendLine("> den bästa gissningen om vad som passar:");
+        sb.AppendLine($">");
+        sb.AppendLine($"> - **Föreslagna features:** {preset.Features}");
+        sb.AppendLine($"> - **Föreslagen layout:** {preset.SuggestedUi}");
+        sb.AppendLine($"> - **Varför:** {preset.Rationale}");
         sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine();
@@ -250,10 +284,28 @@ Exakt tre kodblock i exakt den ordningen — inget annat.
     "density":          "comfortable",
     "timelineGrouping": "month",
     "availableLayouts": ["card", "list"],
-    "homeLayout":       "feed"
+    "homeLayout":       "feed",
+    "headerImage":          "(valfri — bara om headerStyle = \"image\", se listan nedan)",
+    "categoryNavPosition":  "(valfri — bara om features.categoryTabs = true, se listan nedan)"
   }
 }
 ```
+
+> ⚠ VIKTIGT — `ui`-blocket ovan visar bara EN giltig kombination, som exempel på
+> formen. Det är INTE standardvärdet du ska kopiera in oavsett pack. Varje fält
+> har flera riktiga, fullt implementerade alternativ — hela listan (med vad varje
+> värde faktiskt gör visuellt) står här:
+""");
+        sb.AppendLine(LayoutStyleManifest.RenderForPrompt());
+        sb.AppendLine("""
+> Välj kombinationen som passar DEN HÄR briefen — ett lugnt reflektionspack och
+> en handfast checklista-app ska normalt inte landa på samma `headerStyle`/
+> `cardStyle`/`homeLayout`. Om du känner dig osäker, välj ändå MEDVETET (utifrån
+> ton, målgrupp och innehållstyp i briefen) istället för att falla tillbaka på
+> `"surface"`/`"default"`/`"single"`/`"sheet"`/`"feed"` av vana — de är
+> startpunkter, inte rekommendationer. Två packs med olika ton som råkar landa
+> på identisk `ui`-konfiguration är ett tecken på att valet inte gjordes
+> medvetet.
 
 > Fälten `appName`, `packId`, `tagline`, `defaultLanguage` och `languages` är
 > OBLIGATORISKA. Utan dem misslyckas valideringen. Lägg till `languages`-arrayen
@@ -278,13 +330,31 @@ Exakt tre kodblock i exakt den ordningen — inget annat.
 > situationPresets OCH quickActions samtidigt, eller bara någon av dem.
 > Rendas som en knapprad direkt under panikknappen (QuickActionBar.razor).
 
-> `ui.homeLayout` (valfri) — `"feed"` (default, utelämna helt om osäker) är
-> dagens beteende: panikknapp/quickActions + Redo nu + det rullande
-> aktivitetsflödet. `"dashboard"` byter ut startskärmen mot enbart
-> QuickActions + kategoriplattor (DashboardHome.razor) — tänkt för paket
-> byggda kring en handfull distinkta genvägar (typiskt 6–10 QuickActions),
-> INTE för paket med en lång aktivitetslista att bläddra i. Använd bara
-> `"dashboard"` när brief:en uttryckligen beskriver den typen av app.
+> `ui.homeLayout` (valfri, default `"feed"`) — sju möjliga värden, fullständigt
+> beskrivna med vad var och en gör visuellt direkt efter det här schemat
+> (sök efter `ui.homeLayout` i listan där). Samma regel gäller alla sex
+> alternativ till `"feed"`: välj bara ett av dem när brief:en faktiskt
+> beskriver den typen av app (t.ex. `"dashboard"` för en handfull distinkta
+> genvägar, `"map"` för platsbaserat innehåll, `"today"` för en rutin-app)
+> — annars är `"feed"` rätt val, inte ett alternativ att pröva av variation
+> för variationens skull.
+>
+> Om du väljer något annat än `"feed"` eller `"dashboard"`: dessa startsidor
+> använder ett litet antal INBYGGDA gränssnittstexter (knappar, rubriker) som
+> INTE kommer från activities/translations-filerna — de har egna nycklar med
+> engelska default-texter inbyggda i själva komponenten, och visas därför på
+> engelska om inte packets egen `translations.{lang}.json` innehåller samma
+> nycklar. Lägg ALLTID till dessa nycklar där (på packets språk) när du
+> använder motsvarande homeLayout, annars blandas engelsk gränssnittstext in
+> i en annars svensk (eller annat språk) app:
+> - `"map"`: `home.map.consentTitle`, `home.map.consentNotice`, `home.map.pinCount`, `home.map.noPins`
+> - `"today"`: `home.today.heading`, `home.today.notConfigured`, `home.today.allDone`, `home.today.countSingular`, `home.today.countPlural`, `home.today.seeRest`
+> - `"magazine"`: `home.magazine.more`
+> - `"search"`: `home.search.placeholder`, `home.search.totalHint`
+> - `"sections"`: `home.sections.seeAll`, `home.sections.other`, `home.sections.seeAllMixed`
+> Samma sak gäller redan idag `"dashboard"` (`dashboard.browseAll`,
+> `common.categories`, `dashboard.backToHome`) — inte nytt i den här listan,
+> men lika lätt att missa av samma anledning.
 
 ### pack.config.json — EXTRA valfria toppnivåfält
 

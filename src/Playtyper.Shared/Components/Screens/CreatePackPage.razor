@@ -28,43 +28,108 @@
     @if (_step == Step.Brief)
     {
         <div class="card" style="max-width:640px">
-            <h3>Grundinformation</h3>
-            <p class="help-text help-text--tight">Kort information om appen — ju mer du fyller i, desto bättre blir det Claude skriver åt dig. Du kan alltid ändra allt efteråt inne i Playtyper.</p>
+            <div class="mode-toggle" role="tablist" aria-label="Läge">
+                <button type="button" class="mode-toggle__btn @(!_brief.IsQuickMode ? "mode-toggle__btn--active" : "")" @onclick="() => SetQuickMode(false)">Guidad</button>
+                <button type="button" class="mode-toggle__btn @(_brief.IsQuickMode ? "mode-toggle__btn--active" : "")" @onclick="() => SetQuickMode(true)">Snabb</button>
+            </div>
+            <p class="field-note" style="margin:4px 0 14px">
+                @if (_brief.IsQuickMode)
+                {
+                    <text>Beskriv appen med egna ord — Claude tolkar fritt och fyller i resten själv. Bäst när du vet ungefär vad du vill men inte i detalj.</text>
+                }
+                else
+                {
+                    <text>Svara på frågorna nedan en och en, för full kontroll över varje val. Du kan även lägga till egen text längre ner oavsett — de utesluter inte varandra.</text>
+                }
+            </p>
 
-            <label>Kund-ID</label>
-            <p class="field-note" style="margin:-2px 0 4px">En kort teknisk identifierare, bara små bokstäver/siffror/bindestreck (t.ex. <code>borasstad</code>). Går inte att ändra senare.</p>
-            <input @bind="_brief.PackId" placeholder="borasstad" />
-            <label style="margin-top:8px">App-namn</label>
-            <input @bind="_brief.AppName" placeholder="Borås Stad" />
-            <label style="margin-top:8px">Tagline <span class="field-note">(en kort undertext)</span></label>
-            <input @bind="_brief.Tagline" placeholder="Din guide till en tryggare vardag" />
-            <label style="margin-top:8px">Beskrivning</label>
-            <textarea @bind="_brief.Description" rows="2" placeholder="Vad är appen till för?"></textarea>
-            <label style="margin-top:8px">Målgrupp</label>
-            <input @bind="_brief.TargetAudience" placeholder="t.ex. äldre invånare, nyanlända, unga vuxna" />
-            <label style="margin-top:8px">Användningskontext</label>
-            <input @bind="_brief.UsageContext" placeholder="t.ex. akut situation, vardagsstöd, egenvård" />
-            <label style="margin-top:8px">Ton</label>
-            <input @bind="_brief.Tone" placeholder="t.ex. lugn och stödjande, professionell, varm" />
-
-            <div style="display:flex;gap:10px;margin-top:8px">
-                <div style="flex:1">
-                    <label>Primärfärg</label>
-                    <input type="color" @bind="_brief.PrimaryColor" />
-                </div>
-                <div style="flex:1">
-                    <label>Accentfärg</label>
-                    <input type="color" @bind="_brief.AccentColor" />
-                </div>
+            <h3>Vilken typ av app? <span class="field-note">(valfritt — hjälper Claude välja rimliga funktioner och layout direkt)</span></h3>
+            <div class="app-type-grid">
+                @foreach (var preset in FeatureManifest.AppTypePresets)
+                {
+                    <button type="button"
+                            class="app-type-card @(_brief.AppTypePresetId == preset.Id ? "app-type-card--selected" : "")"
+                            title="@preset.For"
+                            @onclick="() => SelectAppType(preset)">
+                        <span class="app-type-card__emoji">@preset.Emoji</span>
+                        <span class="app-type-card__name">@preset.Name</span>
+                    </button>
+                }
             </div>
 
-            <label style="margin-top:8px">Kategorier <span class="field-note">(kommaseparerat)</span></label>
-            <input @bind="_categoriesRaw" placeholder="Andning, Rörelse, Vila, Kontakt" />
+            @if (_brief.IsQuickMode)
+            {
+                <h3 style="margin-top:22px">Grundinformation</h3>
+                <label>Kund-ID</label>
+                <p class="field-note" style="margin:-2px 0 4px">En kort teknisk identifierare, bara små bokstäver/siffror/bindestreck (t.ex. <code>borasstad</code>). Går inte att ändra senare.</p>
+                <input @bind="_brief.PackId" placeholder="borasstad" />
+                <label style="margin-top:8px">App-namn</label>
+                <input @bind="_brief.AppName" placeholder="Borås Stad" />
 
-            <label style="margin-top:8px">Antal aktiviteter <span class="field-note">(ett ungefärligt mål — Claude bestämmer det exakta antalet)</span></label>
-            <input type="number" @bind="_brief.TargetActivityCount" />
+                <label style="margin-top:16px">Beskriv appen</label>
+                <p class="field-note" style="margin:-2px 0 4px">Vad den ska göra, för vem, vilken känsla den ska ha, vilket innehåll som ska finnas. Ju mer konkret, desto bättre resultat — det finns inget för kort eller för långt här.</p>
+                <textarea @bind="_brief.FreeformNotes" rows="9" placeholder="T.ex: En app för nyanställda på räddningstjänsten, som steg-för-steg guidar genom de vanligaste larmtyperna. Lugn men bestämd ton. Ska kännas pålitlig snarare än lekfull…"></textarea>
+            }
+            else
+            {
+                <h3 style="margin-top:22px">Grundinformation</h3>
+                <p class="help-text help-text--tight">Kort information om appen — ju mer du fyller i, desto bättre blir det Claude skriver åt dig. Du kan alltid ändra allt efteråt inne i Playtyper.</p>
 
-            <button class="primary" style="margin-top:16px" @onclick="GeneratePhase1" disabled="@(string.IsNullOrWhiteSpace(_brief.PackId) || string.IsNullOrWhiteSpace(_brief.AppName))">Skriv instruktionen</button>
+                <label>Kund-ID</label>
+                <p class="field-note" style="margin:-2px 0 4px">En kort teknisk identifierare, bara små bokstäver/siffror/bindestreck (t.ex. <code>borasstad</code>). Går inte att ändra senare.</p>
+                <input @bind="_brief.PackId" placeholder="borasstad" />
+                <label style="margin-top:8px">App-namn</label>
+                <input @bind="_brief.AppName" placeholder="Borås Stad" />
+                <label style="margin-top:8px">Tagline <span class="field-note">(en kort undertext)</span></label>
+                <input @bind="_brief.Tagline" placeholder="Din guide till en tryggare vardag" />
+                <label style="margin-top:8px">Beskrivning</label>
+                <textarea @bind="_brief.Description" rows="2" placeholder="Vad är appen till för?"></textarea>
+                <label style="margin-top:8px">Målgrupp</label>
+                <input @bind="_brief.TargetAudience" placeholder="t.ex. äldre invånare, nyanlända, unga vuxna" />
+                <label style="margin-top:8px">Användningskontext</label>
+                <input @bind="_brief.UsageContext" placeholder="t.ex. akut situation, vardagsstöd, egenvård" />
+                <label style="margin-top:8px">Ton</label>
+                <input @bind="_brief.Tone" placeholder="t.ex. lugn och stödjande, professionell, varm" />
+
+                <div style="display:flex;gap:10px;margin-top:8px">
+                    <div style="flex:1">
+                        <label>Primärfärg</label>
+                        <input type="color" @bind="_brief.PrimaryColor" />
+                    </div>
+                    <div style="flex:1">
+                        <label>Accentfärg</label>
+                        <input type="color" @bind="_brief.AccentColor" />
+                    </div>
+                </div>
+
+                <label style="margin-top:8px">Kategorier <span class="field-note">(kommaseparerat — lämna tomt så hittar Claude på rimliga kategorier utifrån beskrivningen)</span></label>
+                <input @bind="_categoriesRaw" placeholder="Andning, Rörelse, Vila, Kontakt" />
+
+                <label style="margin-top:8px">Antal aktiviteter <span class="field-note">(ett ungefärligt mål — Claude bestämmer det exakta antalet)</span></label>
+                <input type="number" @bind="_brief.TargetActivityCount" />
+
+                <label style="margin-top:16px">Beskriv gärna mer med egna ord <span class="field-note">(valfritt — för sådant som inte passar i fälten ovan: stämning, specifikt innehåll, särskilda önskemål)</span></label>
+                <textarea @bind="_brief.FreeformNotes" rows="4" placeholder="T.ex: Ska kännas som en trygg vän snarare än en myndighet. Måste nämna att..."></textarea>
+            }
+
+            <h3 style="margin-top:22px">Källmaterial <span class="field-note">(valfritt)</span></h3>
+            <p class="help-text help-text--tight">Klistra in text Claude ska utgå från — t.ex. innehåll från en befintlig hemsida, ett dokument, eller anteckningar. Används som primär källa istället för att Claude hittar på innehållet själv. Playtyper hämtar inte URL:er automatiskt än — kopiera texten du vill använda och klistra in den här.</p>
+            @for (int i = 0; i < _brief.SourceMaterials.Count; i++)
+            {
+                var idx = i;
+                <div class="source-material-row">
+                    <input value="@_brief.SourceMaterials[idx].Label"
+                           @onchange="e => UpdateSourceLabel(idx, e.Value?.ToString() ?? string.Empty)"
+                           placeholder="Etikett, t.ex. &quot;Kommunens hemsida&quot;" />
+                    <textarea value="@_brief.SourceMaterials[idx].Content"
+                              @onchange="e => UpdateSourceContent(idx, e.Value?.ToString() ?? string.Empty)"
+                              rows="3" placeholder="Klistra in text här…"></textarea>
+                    <button type="button" class="ghost" @onclick="() => _brief.SourceMaterials.RemoveAt(idx)">✕</button>
+                </div>
+            }
+            <button type="button" class="ghost" @onclick="() => _brief.SourceMaterials.Add((string.Empty, string.Empty))">+ Källmaterial</button>
+
+            <button class="primary" style="margin-top:20px" @onclick="GeneratePhase1" disabled="@(string.IsNullOrWhiteSpace(_brief.PackId) || string.IsNullOrWhiteSpace(_brief.AppName))">Skriv instruktionen</button>
         </div>
     }
     else if (_step == Step.Phase1Prompt)
@@ -121,6 +186,28 @@
     .wizard-step--current .wizard-step__dot { background: var(--color-accent); color: var(--color-accent-text); border-color: transparent; }
     .wizard-step--current .wizard-step__label { color: var(--color-text-primary); font-weight: 600; }
     @@media (max-width: 480px) { .wizard-step__label { display: none; } }
+
+    .mode-toggle { display: inline-flex; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
+    .mode-toggle__btn {
+        padding: 6px 16px; border: none; background: var(--color-surface-2); color: var(--color-text-muted);
+        font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .mode-toggle__btn--active { background: var(--color-accent); color: var(--color-accent-text); }
+
+    .app-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; margin: 10px 0 6px; }
+    .app-type-card {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        padding: 10px 6px; border: 1.5px solid var(--color-border); border-radius: 10px;
+        background: var(--color-surface-2); cursor: pointer; text-align: center;
+    }
+    .app-type-card:hover { border-color: var(--color-accent); }
+    .app-type-card--selected { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    .app-type-card__emoji { font-size: 22px; }
+    .app-type-card__name { font-size: 11.5px; color: var(--color-text-primary); line-height: 1.25; }
+
+    .source-material-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 6px; align-items: start; margin-bottom: 6px; }
+    .source-material-row input, .source-material-row textarea { margin: 0; }
+    @@media (max-width: 560px) { .source-material-row { grid-template-columns: 1fr; } }
 </style>
 
 @code {
@@ -156,6 +243,26 @@
     private string _categoriesRaw = "";
     private string? _error;
     private bool _saving;
+
+    // v18: Guidad/Snabb mode toggle + app-type picker + source materials —
+    // wires up PackBrief.IsQuickMode/FreeformNotes/AppTypePresetId/
+    // SourceMaterials, none of which had any UI anywhere in Playtyper
+    // before this change even though PromptGenerator/WriteFreeformSection
+    // already fully supported them (see PackWizard's WizardInterview.cs for
+    // where this concept originally came from). This was the single
+    // highest-impact gap found in the architecture review: every pack
+    // created through this screen got identical hardcoded feature defaults
+    // because nothing here ever varied them.
+    private void SetQuickMode(bool quick) => _brief.IsQuickMode = quick;
+
+    private void SelectAppType(FeatureManifest.AppTypePreset preset) =>
+        _brief.AppTypePresetId = _brief.AppTypePresetId == preset.Id ? null : preset.Id; // click again to deselect
+
+    private void UpdateSourceLabel(int index, string label) =>
+        _brief.SourceMaterials[index] = (label, _brief.SourceMaterials[index].Content);
+
+    private void UpdateSourceContent(int index, string content) =>
+        _brief.SourceMaterials[index] = (_brief.SourceMaterials[index].Label, content);
 
     private string _phase1Prompt = "";
     private string _phase1Response = "";

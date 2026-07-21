@@ -102,10 +102,13 @@ public static class FeatureManifest
         bool RedefineInDark);
 
     public sealed record AppTypePreset(
+        string Id,
+        string Emoji,
         string Name,
         string For,
         string Features,
-        string Rationale);
+        string Rationale,
+        string SuggestedUi);
 
     // ── Features (56 FeatureFlags-fält, exakt verifierade mot PackConfig.cs) ──
 
@@ -423,38 +426,46 @@ public static class FeatureManifest
 
     public static readonly IReadOnlyList<AppTypePreset> AppTypePresets =
     [
-        new("Platser / friluftsliv / utflykter",
+        new("places-outdoor", "🗺️", "Platser / friluftsliv / utflykter",
             "packs där aktiviteter är knutna till konkreta fysiska platser (badplatser, vandringsleder, sevärdheter, kommun-/turistguider)",
             "contentBlocks + map-block per aktivitet, heroImages, imageGallery, galleryLightbox, shareActivity, cardThumbnails",
-            "Användaren kan se VAR platsen är utan att lämna appen, och dela ett tips direkt. Se CONTENT-BLOCK-PALETT → \"map\" för hur koordinater ska anges."),
-        new("Recept / matlagning",
+            "Användaren kan se VAR platsen är utan att lämna appen, och dela ett tips direkt. Se CONTENT-BLOCK-PALETT → \"map\" för hur koordinater ska anges.",
+            "ui.homeLayout: \"map\" (se LAYOUT-STIL-KATALOGEN), ui.headerStyle: \"image\" med en stämningsbild, ui.cardStyle: \"default\" eller \"wall\" om många aktiviteter har foton."),
+        new("recipes", "🍲", "Recept / matlagning",
             "steg-för-steg-instruktioner som ska följas i realtid i köket",
             "guidedMode, printView, doneTracking, favorites",
-            "Guidat läge håller fokus på ett steg i taget med händerna fulla; utskrift är vanligt för recept man vill ha på köksbänken."),
-        new("Stadsguide / turism",
+            "Guidat läge håller fokus på ett steg i taget med händerna fulla; utskrift är vanligt för recept man vill ha på köksbänken.",
+            "ui.headerStyle: \"image\" (en aptitretande bild sätter tonen direkt), ui.cardStyle: \"wall\" eller \"magazine\" om varje rätt har ett foto."),
+        new("city-guide", "🏙️", "Stadsguide / turism",
             "sevärdheter och rekommendationer i en stad eller region",
             "contentBlocks + map-block, heroImages, categoryTabs, situationPresets, multiLanguage",
-            "Samma resonemang som Platser-presetet ovan, men ofta med fler kategorier (mat/kultur/natur) och flerspråkighet för besökare."),
-        new("Vardagsrutin / vanor",
+            "Samma resonemang som Platser-presetet ovan, men ofta med fler kategorier (mat/kultur/natur) och flerspråkighet för besökare.",
+            "ui.homeLayout: \"map\" eller \"sections\" (en hylla per kategori: mat/kultur/natur), ui.categoryNavPosition: \"pinned\" — många kategorier man vill växla mellan snabbt."),
+        new("daily-routine", "🔁", "Vardagsrutin / vanor",
             "återkommande, ofta dagliga eller veckovisa aktiviteter (t.ex. städning, egenvård, familjerutiner)",
             "streakTracking, doneTracking, weeklyGoal, reminders, badges",
-            "Streak och veckomål ger den där \"håll igång\"-känslan; påminnelser knuffar användaren att faktiskt öppna appen."),
-        new("Lärande / quiz / fakta",
+            "Streak och veckomål ger den där \"håll igång\"-känslan; påminnelser knuffar användaren att faktiskt öppna appen.",
+            "ui.homeLayout: \"today\" — visar bara det som faktiskt är kvar att göra idag, vilket är hela poängen med den här app-typen."),
+        new("learning-quiz", "🧠", "Lärande / quiz / fakta",
             "kunskapsbaserat innehåll där användaren ska lära sig något",
             "quiz, badges (quizPerfect/quizCompleted-triggers), progressionLock, textToSpeech",
-            "Progression låser upp nästa modul efter föregående — bra pedagogisk ordning. Quiz-badges belönar både deltagande och prestation."),
-        new("Reflektion / dagbok / mental hälsa",
+            "Progression låser upp nästa modul efter föregående — bra pedagogisk ordning. Quiz-badges belönar både deltagande och prestation.",
+            "ui.homeLayout: \"sections\" om ämnet delar naturligt in sig i moduler/kategorier, annars \"feed\" i progressionsordning — undvik \"dashboard\"/\"magazine\", de passar dåligt med progressionLock."),
+        new("reflection-journal", "📓", "Reflektion / dagbok / mental hälsa",
             "packs utan diskreta \"aktiviteter\" i vanlig mening — snarare fria anteckningar/inspelningar över tid",
             "voiceRecorder (INTE activityVoiceNotes/logbookVoiceNotes), activityNotes, logbook",
-            "Det här är det EXPLICITA undantagsfallet där voiceRecorder (fristående inspelningslista) är rätt val istället för de aktivitetskopplade röstflaggorna — se \"AlternativeTo\"-noten på voiceRecorder i feature-listan."),
-        new("Barn / familj",
+            "Det här är det EXPLICITA undantagsfallet där voiceRecorder (fristående inspelningslista) är rätt val istället för de aktivitetskopplade röstflaggorna — se \"AlternativeTo\"-noten på voiceRecorder i feature-listan.",
+            "ui.headerStyle: \"transparent\", ui.density: \"comfortable\", defaultLayoutMode: \"timeline\" — en lugn, textfokuserad känsla snarare än ett kortrutnät."),
+        new("kids-family", "🧒", "Barn / familj",
             "aktiviteter riktade till barn eller familjer med blandade åldrar",
             "ageAdaptedSteps, showEmoji=true, fontSizeScale, panicButton (alltid på — se schema), guidedMode",
-            "ageAdaptedSteps kräver ett åldersfilter vars values matchar stepsPerAge-nycklarna (se Requires på den flaggan)."),
-        new("Äldre / tillgänglighet i fokus",
+            "ageAdaptedSteps kräver ett åldersfilter vars values matchar stepsPerAge-nycklarna (se Requires på den flaggan).",
+            "ui.cardStyle: \"default\" med showEmoji på (INTE \"wall\"/\"magazine\" — text-lätta, tydliga kort passar bättre för barn), ui.density: \"comfortable\"."),
+        new("elderly-accessible", "🦻", "Äldre / tillgänglighet i fokus",
             "packs där målgruppen uttryckligen är äldre eller har tillgänglighetsbehov",
             "fontSizeScale=true, showEmoji (överväg false för en lugnare, mer textbaserad känsla), textToSpeech, densityUserToggle",
-            "fontSizeScale rekommenderas starkt (se WhenHow på den flaggan) snarare än att bara vara ett alternativ bland andra."),
+            "fontSizeScale rekommenderas starkt (se WhenHow på den flaggan) snarare än att bara vara ett alternativ bland andra.",
+            "ui.density: \"comfortable\" (ALDRIG \"minimal\" eller \"compact\" för den här app-typen), ui.gridStyle: \"single\", ui.detailStyle: \"fullscreen\" — mindre att hålla reda på samtidigt."),
     ];
 
     // ── Rendering ────────────────────────────────────────────────────────────
@@ -547,8 +558,9 @@ public static class FeatureManifest
         var sb = new StringBuilder();
         foreach (var p in AppTypePresets)
         {
-            sb.AppendLine($"- **{p.Name}** ({p.For}): {p.Features}");
+            sb.AppendLine($"- **{p.Emoji} {p.Name}** (`{p.Id}`) — {p.For}: {p.Features}");
             sb.AppendLine($"  _{p.Rationale}_");
+            sb.AppendLine($"  Layoutförslag: {p.SuggestedUi}");
         }
         return sb.ToString().TrimEnd('\n', '\r');
     }

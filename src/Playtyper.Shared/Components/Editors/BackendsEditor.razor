@@ -63,6 +63,11 @@
     <button class="ghost" @onclick='() => { Draft.Config.Backends.Add(new BackendConfig { Id = $"backend-{Draft.Config.Backends.Count + 1}" }); Notify(); }'>+ Backend</button>
 
     <h3 style="margin-top:28px">Lösenordsskydd</h3>
+    <p class="section-hint">
+        Skiljer sig från "Inloggningskrav" ovan: det här är ETT delat lösenord för HELA appen (ingen server inblandad,
+        bara en enkel spärr), medan Inloggningskrav ovan gäller anslutningen till en enskild backend
+        (antingen riktiga per-person-konton, eller en delad nyckel servern kontrollerar). De två går att kombinera.
+    </p>
     <label class="toggle-row">
         <input type="checkbox" checked="@(Draft.Config.Auth?.Enabled ?? false)" @onchange="ToggleAuth" />
         Kräv lösenord för att öppna appen
@@ -73,8 +78,13 @@
         <div class="field-grid" style="margin-top:8px">
             <div>
                 <label>Nytt lösenord</label>
-                <input type="password" @bind="_newPassword" @bind:event="oninput" @bind:after="() => ApplyPassword(auth)" placeholder="lämna tomt för att behålla nuvarande" />
-                <span class="field-note">Lösenordet skrivs aldrig till GitHub i klartext — det omvandlas direkt till en kod (en "hash", se nedan) som går att kontrollera mot, men inte gå baklänges ifrån.</span>
+                <div class="password-apply-row">
+                    <input type="password" @bind="_newPassword" @bind:event="oninput" @onkeydown="e => HandlePasswordKeydown(e, () => ApplyPassword(auth))" placeholder="lämna tomt för att behålla nuvarande" />
+                    <button type="button" class="ghost" disabled="@string.IsNullOrEmpty(_newPassword)" @onclick="() => ApplyPassword(auth)">Använd</button>
+                </div>
+                <span class="field-note">
+                    Skriv klart hela lösenordet och tryck sedan på "Använd" (eller Enter) — lösenordet skrivs aldrig till GitHub i klartext, det omvandlas då direkt till en kod ("hash", se nedan) som går att kontrollera mot, men inte gå baklänges ifrån.
+                </span>
             </div>
             <div>
                 <label>Sessionslängd (timmar)</label>
@@ -104,7 +114,10 @@
         <div class="field-grid">
             <div>
                 <label>Nytt admin-lösenord</label>
-                <input type="password" @bind="_newAdminPassword" @bind:event="oninput" @bind:after="() => ApplyAdminPassword(auth)" placeholder="lämna tomt = ingen adminåtkomst" />
+                <div class="password-apply-row">
+                    <input type="password" @bind="_newAdminPassword" @bind:event="oninput" @onkeydown="e => HandlePasswordKeydown(e, () => ApplyAdminPassword(auth))" placeholder="lämna tomt = ingen adminåtkomst" />
+                    <button type="button" class="ghost" disabled="@string.IsNullOrEmpty(_newAdminPassword)" @onclick="() => ApplyAdminPassword(auth)">Använd</button>
+                </div>
             </div>
             <div>
                 <label>Admin-sessionslängd (timmar)</label>
@@ -135,6 +148,9 @@
     .stack-item { padding: 12px; }
     .stack-item__remove { margin-top: 10px; font-size: 12px; padding: 4px 10px; color: var(--color-danger-text); }
     code { font-size: 11px; word-break: break-all; background: var(--color-surface-2); padding: 2px 5px; border-radius: 4px; }
+    .password-apply-row { display: flex; gap: 6px; align-items: center; }
+    .password-apply-row input { flex: 1; margin: 0; }
+    .password-apply-row button { flex-shrink: 0; white-space: nowrap; }
     @@media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
 </style>
 
@@ -181,6 +197,18 @@
             _newAdminPassword = "";
         }
         Notify();
+    }
+
+    // v18 bugfix: password fields used to be wired with @bind:event="oninput"
+    // PLUS @bind:after calling Apply*Password on every keystroke — which
+    // hashed-and-cleared the field after each character, so a multi-character
+    // password could never be entered reliably (this was reported directly:
+    // a password set this way silently failed to work later). Fields now
+    // only commit on an explicit "Använd" click or Enter, handled here —
+    // never mid-typing.
+    private static void HandlePasswordKeydown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Action apply)
+    {
+        if (e.Key == "Enter") apply();
     }
 
     // Samma algoritm som tools/generate-hash/generate-hash.html: rått UTF8,
